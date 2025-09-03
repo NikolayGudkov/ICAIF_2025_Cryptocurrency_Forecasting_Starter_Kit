@@ -12,7 +12,7 @@ In this starter kit, we include:
 
 1. **Data importing** (`train.pkl`, `x_test.pkl`, `y_test.pkl` for organizers)  
 2. **Model baselines** (a vae-based model)  
-3. **Training & inference pipelines** (with `src/quickstart.ipynb`)  
+3. **Training & inference pipelines** (with `quickstart.ipynb`)  
 4. **Evaluation module** (`src/metrics.py` for official metrics)  
 5. **Trading simulation module** (`src/trading.py` for portfolio-style evaluation)
 
