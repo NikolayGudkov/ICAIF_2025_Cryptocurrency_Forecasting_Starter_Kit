@@ -88,7 +88,7 @@ We provide a sample submission file at [sample\_submission/](sample_submission/)
 
 ## Quickstart
 
-We provide [`src/quickstart.ipynb`](src/quickstart.ipynb), which demonstrates:
+We provide [`quickstart.ipynb`](quickstart.ipynb), which demonstrates:
 
 1. Loading the dataset (`x_train.pkl`, `x_test.pkl`)
 2. Training a baseline model (e.g., **TinyTimeVAE**)
