@@ -10,7 +10,7 @@ For more details about the competition, visit the [Competition Website](https://
 ## Pipeline Overview
 In this starter kit, we include:
 
-1. **Data importing** (`x_train.pkl`, `x_test.pkl`, `y_test.pkl` for organizers)  
+1. **Data importing** (`train.pkl`, `x_test.pkl`, `y_test.pkl` for organizers)  
 2. **Model baselines** (a vae-based model)  
 3. **Training & inference pipelines** (with `src/quickstart.ipynb`)  
 4. **Evaluation module** (`src/metrics.py` for official metrics)  
@@ -44,7 +44,7 @@ For this challenge, the training and test data are located at [data/](data/).
 
 * **Training set**:
 
-  * [`x_train.pkl`](data/): Contains **continuous minute-level sequences** (close, volume).
+  * [`train.pkl`](data/): Contains **continuous minute-level sequences** (close, volume).
   * Each row has:
 
     * `series_id`: identifier for each continuous series
@@ -90,7 +90,7 @@ We provide a sample submission file at [sample\_submission/](sample_submission/)
 
 We provide [`quickstart.ipynb`](quickstart.ipynb), which demonstrates:
 
-1. Loading the dataset (`x_train.pkl`, `x_test.pkl`)
+1. Loading the dataset (`train.pkl`, `x_test.pkl`)
 2. Training a baseline model (e.g., **TinyTimeVAE**)
 3. Running inference to generate a `submission.pkl`
 

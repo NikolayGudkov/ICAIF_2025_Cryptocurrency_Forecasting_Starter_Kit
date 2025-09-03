@@ -11,7 +11,7 @@
     "volume": "float32"
   },
   "outputs": {
-    "x_train": {
+    "train": {
       "columns": [
         "series_id",
         "time_step",
@@ -36,7 +36,7 @@
     }
   },
   "sha256": {
-    "x_train.pkl": "2d62b659711bd25765a8561e4bf07bb14a0362cf9e1567d2fa1ca6455b212d9b",
+    "train.pkl": "2d62b659711bd25765a8561e4bf07bb14a0362cf9e1567d2fa1ca6455b212d9b",
     "x_test.pkl": "aafeb0eec58f949f325bddcafe0bfce6acca0e005d16d3c440e009454f042d85",
     "y_test.pkl": "b22464ab8d099d192893c9088f732841b8ef008aef85f61cd60812fd97bbaf95"
   }

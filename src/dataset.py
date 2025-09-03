@@ -4,12 +4,12 @@ from typing import Iterator, Tuple, Optional, Dict, Any
 
 class TrainWindowSampler:
     """
-    Build (X, y) samples from x_train by slicing non-overlapping or rolling windows of length 70,
+    Build (X, y) samples from train by slicing non-overlapping or rolling windows of length 70,
     where X is the first 60 steps (close, volume) and y is the next 10 steps (close).
     """
     def __init__(
         self,
-        x_train_path: str,
+        train_path: str,
         window: int = 70,
         input_len: int = 60,
         horizon_len: int = 10,
@@ -26,11 +26,11 @@ class TrainWindowSampler:
         if step_size is not None:
             self.step_size = step_size
 
-        self.df = pd.read_pickle(x_train_path)
+        self.df = pd.read_pickle(train_path)
         # Expect columns: ['series_id','time_step','close','volume']
         required = {'series_id','time_step','close','volume'}
         if not required.issubset(self.df.columns):
-            raise ValueError(f"x_train missing columns, found {self.df.columns}")
+            raise ValueError(f"train missing columns, found {self.df.columns}")
 
         self.rng = np.random.default_rng(seed)
 
