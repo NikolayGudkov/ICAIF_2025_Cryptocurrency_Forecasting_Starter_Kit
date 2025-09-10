@@ -128,7 +128,7 @@ These give both statistical accuracy and portfolio-style economic interpretation
 If you use this starter kit or related data in your work, please cite:
 
 ```
-Yihao Ang, Qiang Wang, Yifan Bao, Xinyu Xi, Anthony K. H. Tung, ICAIF 2025: Cryptocurrency Forecasting Competition Starter Kit,
+Y. Ang, Q. Wang, Y. Bao, X. Xi, A. K. H. Tung, Q. Huang, H. Ni, and L. Szpruch.
 https://github.com/MilleXi/ICAIF_2025_Cryptocurrency_Forecasting_Starter_Kit, 2025
 ```
 
