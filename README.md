@@ -1,4 +1,4 @@
-# ICAIF_2025_Cryptocurrency_Forecasting_Starter_Kit
+# ICAIF 2025 Cryptocurrency Forecasting Starter Kit
 
 Welcome to our **ICAIF 2025 competition: Cryptocurrency Forecasting** Starter Kit repository.  
 This repository provides a standard pipeline to help you quickly get started with the competition.
