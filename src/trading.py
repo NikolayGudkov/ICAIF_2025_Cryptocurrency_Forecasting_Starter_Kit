@@ -1,17 +1,20 @@
 """
 Cross-sectional strategies for the 60->10 task that DO NOT require x_test.
- Requirements:
-   y_true must contain columns: ['window_id','time_step','close','base_close']
-   y_pred must contain columns: ['window_id','time_step','pred_close']
- Strategies:
-   - CSM (Cross-Sectional Momentum): long top decile by predicted returns, short bottom decile (equal-weight).
-   - LOTQ (Long-Only Top-Quantile): long-only top 20% by predicted returns (equal-weight), zero elsewhere.
+Requirements:
+  y_true must contain columns: ['window_id','time_step','close','base_close']
+  y_pred must contain columns: ['window_id','time_step','pred_close']
+Strategies:
+  - CSM (Cross-Sectional Momentum): long top decile by predicted returns,
+    short bottom decile (equal-weight).
+  - LOTQ (Long-Only Top-Quantile): long-only top 20% by predicted returns
+    (equal-weight), zero elsewhere.
+  - PW (Proportional-Weighting): long-only; weights are proportional to
+    predicted returns at the horizon. Emphasizes magnitude instead of rank.
 """
 
 from typing import List
 import numpy as np
 import pandas as pd
-
 
 # --------------------------- Utilities ---------------------------
 
@@ -45,10 +48,7 @@ def _returns_truth_pred_at_h(
     p['pred_ret'] = p['pred_close'] / (p['base_close'] + 1e-12) - 1.0
 
     df = p[['window_id','pred_ret']].merge(t[['window_id','true_ret']], on='window_id', how='inner')
-    # One row per window_id at the chosen horizon
-    return df
-
-
+    return df  # one row per window_id at the chosen horizon
 
 # --------------------------- Strategies ---------------------------
 
@@ -64,11 +64,9 @@ def CSM(
       - Short equal-weight the bottom decile by predicted returns.
       - Portfolio return = mean(true_ret of long) - mean(true_ret of short).
     Returns an array of realized portfolio returns across the cross section
-    (one per evaluation batch; here it is a single scalar for the chosen horizon).
+    (one scalar here for the chosen horizon).
     """
     df = _returns_truth_pred_at_h(y_true, y_pred, horizon_step)
-
-    # thresholds
     q_hi = np.quantile(df['pred_ret'].to_numpy(), 1.0 - top_decile)
     q_lo = np.quantile(df['pred_ret'].to_numpy(), top_decile)
 
@@ -80,7 +78,6 @@ def CSM(
 
     port_ret = long_ret - short_ret
     return np.array([port_ret], dtype=np.float64)
-
 
 def LOTQ(
     y_true: pd.DataFrame,
@@ -95,13 +92,39 @@ def LOTQ(
     Returns an array with one realized portfolio return for the chosen horizon.
     """
     df = _returns_truth_pred_at_h(y_true, y_pred, horizon_step)
-
     thr = np.quantile(df['pred_ret'].to_numpy(), 1.0 - top_quantile)
     long_leg = df[df['pred_ret'] >= thr]
     long_ret = float(long_leg['true_ret'].mean()) if len(long_leg) else 0.0
-
     return np.array([long_ret], dtype=np.float64)
 
+def PW(
+    y_true: pd.DataFrame,
+    y_pred: pd.DataFrame,
+    horizon_step: int = 0,
+    clip_negative: bool = True,
+    eps: float = 1e-12,
+) -> np.ndarray:
+    """
+    Proportional-Weighting (PW):
+      - Allocate portfolio weights proportional to predicted returns.
+      - By default, negative predicted returns are clipped to zero (long-only).
+      - Portfolio return = weighted sum of true returns with proportional weights.
+    Returns an array with one realized portfolio return for the chosen horizon.
+    """
+    df = _returns_truth_pred_at_h(y_true, y_pred, horizon_step)
+    rhat = df['pred_ret'].to_numpy().astype(np.float64)
+
+    if clip_negative:
+        rhat = np.maximum(rhat, 0.0)
+
+    denom = rhat.sum()
+    if denom <= eps:
+        # No positive signal mass → zero exposure fallback
+        return np.array([0.0], dtype=np.float64)
+
+    w = rhat / denom  # long-only, non-negative, sums to 1
+    realized = float((w * df['true_ret'].to_numpy().astype(np.float64)).sum())
+    return np.array([realized], dtype=np.float64)
 
 # --------------------------- Convenience ---------------------------
 
@@ -112,13 +135,15 @@ def run_strategy(
     horizon_step: int = 0,
 ) -> np.ndarray:
     """
-    Dispatch a strategy by name: 'CSM' or 'LOTQ'.
+    Dispatch a strategy by name: 'CSM', 'LOTQ', or 'PW'.
     Returns the realized portfolio return series (np.ndarray).
     """
-    name = name.upper()
-    if name == 'CSM':
+    key = name.upper()
+    if key == 'CSM':
         return CSM(y_true, y_pred, horizon_step=horizon_step)
-    elif name == 'LOTQ':
+    elif key == 'LOTQ':
         return LOTQ(y_true, y_pred, horizon_step=horizon_step)
+    elif key in ('PW', 'PROPORTIONAL', 'S3'):
+        return PW(y_true, y_pred, horizon_step=horizon_step)
     else:
         raise ValueError(f"Unknown strategy: {name}")

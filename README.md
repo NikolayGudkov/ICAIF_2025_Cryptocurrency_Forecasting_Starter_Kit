@@ -10,7 +10,7 @@ For more details about the competition, visit the [Competition Website](https://
 ## Pipeline Overview
 In this starter kit, we include:
 
-1. **Data importing** (`train.pkl`, `x_test.pkl`, `y_test.pkl` for organizers)  
+1. **Data importing** (`train.pkl`, `x_test.pkl`, `y_test_local.pkl`)  
 2. **Model baselines** (a vae-based model)  
 3. **Training & inference pipelines** (with `quickstart.ipynb`)  
 4. **Evaluation module** (`src/metrics.py` for official metrics)  
@@ -64,7 +64,7 @@ For this challenge, the training and test data are located at [data/](data/).
     * `close`: closing price 
     * `volume`: traded volume
 
-  * [`y_test.pkl`](data/): Provided only to organizers for offline evaluation (future 10 steps of close).
+  * [`y_test_local.pkl`](data/): Provided to participants for local test (future 10 steps of close).
 
 **Task Definition**:
 Given the last **60 minutes** of `close, volume`, forecast the next **10 minutes of close**.
@@ -91,7 +91,7 @@ We provide a sample submission file at [sample\_submission/](sample_submission/)
 We provide [`quickstart.ipynb`](quickstart.ipynb), which demonstrates:
 
 1. Loading the dataset (`train.pkl`, `x_test.pkl`)
-2. Training a baseline model (e.g., **TinyTimeVAE**)
+2. Training a baseline model (e.g., **ARIMA**)
 3. Running inference to generate a `submission.pkl`
 
 Example preview from the notebook:
@@ -118,7 +118,8 @@ We provide two levels of evaluation:
 
    * **CSM** (Cross-Sectional Momentum: long top decile, short bottom decile)
    * **LOTQ** (Long-Only Top Quantile: long-only top 20%)
-
+   * **PW** (Proportional-Weighting: allocate weights proportional to predicted returns, long-only by default)  
+   
 These give both statistical accuracy and portfolio-style economic interpretation.
 
 ---

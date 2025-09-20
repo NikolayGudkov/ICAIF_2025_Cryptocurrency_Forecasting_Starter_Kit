@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 from typing import Dict, Tuple
+from trading import CSM, LOTQ, PW
 
 # ----------------- Utility -----------------s
 def _base_from_x_test(x_test: pd.DataFrame) -> pd.DataFrame:
@@ -52,56 +53,52 @@ def IR(y_true: pd.DataFrame, y_pred: pd.DataFrame, x_test: pd.DataFrame) -> floa
     if len(ics) < 2: return 0.0
     return float(np.mean(ics) / (np.std(ics) + 1e-12))
 
-def SharpeRatio(y_true: pd.DataFrame, y_pred: pd.DataFrame, x_test: pd.DataFrame) -> float:
-    tr, pr = _returns_truth_pred(y_true, y_pred, x_test)
-    df = tr.merge(pr, on=['window_id','time_step'])
-    # portfolio: top 20% long
-    rets = []
-    for h, g in df.groupby('time_step'):
-        thr = np.quantile(g['pred_ret'], 0.8)
-        sel = g[g['pred_ret'] >= thr]
-        r = sel['true_ret'].mean() if len(sel) else 0.0
-        rets.append(r)
-    rets = np.array(rets)
-    return float(np.mean(rets) / (np.std(rets) + 1e-12)) if len(rets) else 0.0
+def _sharpe_ratio(rets: np.ndarray) -> float:
+    if len(rets) == 0: return 0.0
+    return float(np.mean(rets) / (np.std(rets) + 1e-12))
 
-def MDD(y_true: pd.DataFrame, y_pred: pd.DataFrame, x_test: pd.DataFrame) -> float:
-    tr, pr = _returns_truth_pred(y_true, y_pred, x_test)
-    df = tr.merge(pr, on=['window_id','time_step'])
-    # simple path: equally weighted portfolio per horizon
-    rets = []
-    for h, g in df.groupby('time_step'):
-        rets.append(g['true_ret'].mean())
-    if not rets: return 0.0
-    equity = np.cumprod(1.0 + np.array(rets))
+def _max_drawdown(rets: np.ndarray) -> float:
+    if len(rets) == 0: return 0.0
+    equity = np.cumprod(1.0 + rets)
     peak = np.maximum.accumulate(equity)
     dd = peak - equity
     return float(np.max(dd)) if dd.size else 0.0
 
-def VaR(y_true: pd.DataFrame, y_pred: pd.DataFrame, x_test: pd.DataFrame, alpha: float=0.05) -> float:
-    tr, pr = _returns_truth_pred(y_true, y_pred, x_test)
-    df = tr.merge(pr, on=['window_id','time_step'])
-    rets = df['true_ret'].to_numpy()
-    return float(np.nanpercentile(rets, 100*alpha)) if len(rets) else 0.0
+def _var(rets: np.ndarray, alpha: float = 0.05) -> float:
+    if len(rets) == 0: return 0.0
+    return float(np.nanpercentile(rets, 100 * alpha))
 
-def ES(y_true: pd.DataFrame, y_pred: pd.DataFrame, x_test: pd.DataFrame, alpha: float=0.05) -> float:
-    tr, pr = _returns_truth_pred(y_true, y_pred, x_test)
-    df = tr.merge(pr, on=['window_id','time_step'])
-    rets = df['true_ret'].to_numpy()
-    if not len(rets): return 0.0
-    var = np.nanpercentile(rets, 100*alpha)
+def _es(rets: np.ndarray, alpha: float = 0.05) -> float:
+    if len(rets) == 0: return 0.0
+    var = np.nanpercentile(rets, 100 * alpha)
     tail = rets[rets <= var]
     return float(np.mean(tail)) if len(tail) else var
-
 # ----------------- One-call wrapper -----------------
-def evaluate_all_metrics(y_true: pd.DataFrame, y_pred: pd.DataFrame, x_test: pd.DataFrame) -> Dict[str, float]:
-    return {
+def evaluate_all_metrics(
+    y_true: pd.DataFrame,
+    y_pred: pd.DataFrame,
+    x_test: pd.DataFrame,
+    y_true_with_base: pd.DataFrame,
+    horizon_step: int = 0,
+    alpha: float = 0.05,
+) -> Dict[str, float]:
+    """
+    Return a flat dict with error metrics and trading-based metrics
+    (SharpeRatio, MDD, VaR, ES) for each strategy (CSM, LOTQ, PW).
+    """
+    results = {
         "MSE": MSE(y_true, y_pred),
         "MAE": MAE(y_true, y_pred),
         "IC": IC(y_true, y_pred, x_test),
         "IR": IR(y_true, y_pred, x_test),
-        "SharpeRatio": SharpeRatio(y_true, y_pred, x_test),
-        "MDD": MDD(y_true, y_pred, x_test),
-        "VaR": VaR(y_true, y_pred, x_test),
-        "ES": ES(y_true, y_pred, x_test),
     }
+
+    # iterate over three strategies
+    for name, fn in {"CSM": CSM, "LOTQ": LOTQ, "PW": PW}.items():
+        rets = fn(y_true_with_base, y_pred, horizon_step=horizon_step)
+        results[f"SharpeRatio_{name}"] = _sharpe_ratio(rets)
+        results[f"MDD_{name}"] = _max_drawdown(rets)
+        results[f"VaR_{name}"] = _var(rets, alpha)
+        results[f"ES_{name}"] = _es(rets, alpha)
+
+    return results

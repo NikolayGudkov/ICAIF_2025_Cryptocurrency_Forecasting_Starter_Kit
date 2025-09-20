@@ -27,7 +27,7 @@
         "volume"
       ]
     },
-    "y_test": {
+    "y_test_local": {
       "columns": [
         "window_id",
         "time_step",
@@ -36,8 +36,8 @@
     }
   },
   "sha256": {
-    "train.pkl": "2d62b659711bd25765a8561e4bf07bb14a0362cf9e1567d2fa1ca6455b212d9b",
-    "x_test.pkl": "aafeb0eec58f949f325bddcafe0bfce6acca0e005d16d3c440e009454f042d85",
-    "y_test.pkl": "b22464ab8d099d192893c9088f732841b8ef008aef85f61cd60812fd97bbaf95"
+    "train.pkl": "f18af2ae073ccf53747d57d9607304dd04fd7dc3e04d6d4a0143776a44044527",
+    "x_test.pkl": "220465762feb375b96ae5af41a9e910f39a2bf7bed3a176b43d21cdfcda5aec5",
+    "y_test_local.pkl": "bd40d6806e27ce47d7bb35e2e3638bf02c2b868c6d78a70240aef84a82b6bfcd"
   }
 }
