@@ -83,8 +83,8 @@ def evaluate_all_metrics(
     alpha: float = 0.05,
 ) -> Dict[str, float]:
     """
-    Return a flat dict with error metrics and trading-based metrics
-    (SharpeRatio, MDD, VaR, ES) for each strategy (CSM, LOTQ, PW).
+    Return a flat dict with error metrics and the AVERAGE of trading-based metrics
+    (SharpeRatio, MDD, VaR, ES) across strategies (CSM, LOTQ, PW).
     """
     results = {
         "MSE": MSE(y_true, y_pred),
@@ -93,12 +93,21 @@ def evaluate_all_metrics(
         "IR": IR(y_true, y_pred, x_test),
     }
 
-    # iterate over three strategies
-    for name, fn in {"CSM": CSM, "LOTQ": LOTQ, "PW": PW}.items():
+    # collect per-strategy metrics, then average
+    sharpe_list, mdd_list, var_list, es_list = [], [], [], []
+
+    for fn in (CSM, LOTQ, PW):
         rets = fn(y_true_with_base, y_pred, horizon_step=horizon_step)
-        results[f"SharpeRatio_{name}"] = _sharpe_ratio(rets)
-        results[f"MDD_{name}"] = _max_drawdown(rets)
-        results[f"VaR_{name}"] = _var(rets, alpha)
-        results[f"ES_{name}"] = _es(rets, alpha)
+        sharpe_list.append(_sharpe_ratio(rets))
+        mdd_list.append(_max_drawdown(rets))
+        var_list.append(_var(rets, alpha))
+        es_list.append(_es(rets, alpha))
+
+    # simple averages (fallback to 0.0 if any list is empty)
+    results["SharpeRatio"] = float(np.mean(sharpe_list)) if sharpe_list else 0.0
+    results["MDD"]         = float(np.mean(mdd_list))    if mdd_list    else 0.0
+    results["VaR"]         = float(np.mean(var_list))    if var_list    else 0.0
+    results["ES"]          = float(np.mean(es_list))     if es_list     else 0.0
 
     return results
+
