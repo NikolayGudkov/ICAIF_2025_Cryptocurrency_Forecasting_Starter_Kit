@@ -13,14 +13,30 @@ def _base_from_x_test(x_test: pd.DataFrame) -> pd.DataFrame:
     base = base.rename(columns={'close':'base_close'})
     return base
 
-def _returns_truth_pred(y_true: pd.DataFrame, y_pred: pd.DataFrame, x_test: pd.DataFrame):
+def _returns_truth_pred(    y_true: pd.DataFrame,
+    y_pred: pd.DataFrame,
+    x_test: pd.DataFrame,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     base = _base_from_x_test(x_test)
-    t = y_true.merge(base, on='window_id', how='inner')
-    p = y_pred.merge(base, on='window_id', how='inner')
-    t['true_ret'] = t['close'] / (t['base_close'] + 1e-12) - 1.0
-    p['pred_ret'] = p['pred_close'] / (p['base_close'] + 1e-12) - 1.0
-    return t, p
 
+    # sort to make groupby-shift deterministic
+    tr = y_true.merge(base, on='window_id', how='inner').sort_values(['window_id','time_step']).copy()
+    pr = y_pred.merge(base, on='window_id', how='inner').sort_values(['window_id','time_step']).copy()
+    eps = 1e-12
+
+    # true step-wise returns
+    tr['prev_close'] = tr.groupby('window_id')['close'].shift(1)
+    tr['den_true']   = tr['prev_close'].fillna(tr['base_close'])
+    tr['true_ret']   = tr['close'] / (tr['den_true'] + eps) - 1.0
+    tr = tr.drop(columns=['prev_close','den_true'])
+
+    # pred step-wise returns
+    pr['prev_pred'] = pr.groupby('window_id')['pred_close'].shift(1)
+    pr['den_pred']  = pr['prev_pred'].fillna(pr['base_close'])
+    pr['pred_ret']  = pr['pred_close'] / (pr['den_pred'] + eps) - 1.0
+    pr = pr.drop(columns=['prev_pred','den_pred'])
+
+    return tr, pr
 # ----------------- Metrics -----------------
 def MSE(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> float:
     df = y_true.merge(y_pred, on=['window_id','time_step'])

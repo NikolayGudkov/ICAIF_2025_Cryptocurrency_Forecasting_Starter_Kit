@@ -101,13 +101,13 @@ def PW(
     y_true: pd.DataFrame,
     y_pred: pd.DataFrame,
     horizon_step: int = 0,
-    clip_negative: bool = True,
+    clip_negative: bool = False,   # default: signed weights
     eps: float = 1e-12,
 ) -> np.ndarray:
     """
     Proportional-Weighting (PW):
       - Allocate portfolio weights proportional to predicted returns.
-      - By default, negative predicted returns are clipped to zero (long-only).
+      - Default uses signed weights (allowing long/short).
       - Portfolio return = weighted sum of true returns with proportional weights.
     Returns an array with one realized portfolio return for the chosen horizon.
     """
@@ -116,13 +116,17 @@ def PW(
 
     if clip_negative:
         rhat = np.maximum(rhat, 0.0)
+        denom = rhat.sum()
+        if denom <= eps:
+            return np.array([0.0], dtype=np.float64)
+        w = rhat / denom
+    else:
+        # Signed weights: normalize by L1 norm to avoid degenerate denominator
+        denom = np.sum(np.abs(rhat))
+        if denom <= eps:
+            return np.array([0.0], dtype=np.float64)
+        w = rhat / denom
 
-    denom = rhat.sum()
-    if denom <= eps:
-        # No positive signal mass → zero exposure fallback
-        return np.array([0.0], dtype=np.float64)
-
-    w = rhat / denom  # long-only, non-negative, sums to 1
     realized = float((w * df['true_ret'].to_numpy().astype(np.float64)).sum())
     return np.array([realized], dtype=np.float64)
 
