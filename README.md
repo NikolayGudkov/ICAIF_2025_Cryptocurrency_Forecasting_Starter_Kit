@@ -73,21 +73,6 @@ Given the last **60 minutes** of `close, volume`, forecast the next **10 minutes
 
 ## Sample Submission
 
-We provide a sample submission file at [./sample\_submission/](./sample_submission/) which includes:
-
-* **`submission_example.pkl`**: A DataFrame with the following columns:
-  * `window_id`: ID of each forecast window
-  * `time_step`: horizon step (0-9 for 10 minutes ahead)
-  * `pred_close`: your predicted close price
-
-**Shape requirement**: For each `window_id`, there must be exactly 10 rows with `time_step=0-9`.
-
-
-
-
-
-## Sample Submission
-
 A minimal submission sample is provided in [./sample\_submission/](./sample_submission/) with the following files (no subfolders inside the zip):
 
 * **`submission_example.pkl`** is a dataframe with the following columns:
