@@ -93,7 +93,7 @@ A minimal example is provided in `sample_submission/` with the following files (
 * **`inference.py`** (optional)
   If you use extra pre/post-processing, include `generate_forecast(x_test_path)` that produces `submission.pkl`.
 
-Please ensure your archive is named submission.zip and the forecast file inside is exactly submission.pkl (rename from the Starter Kit if needed).
+Please ensure your archive is named **`submission.zip`** and the forecast file inside is exactly **`submission.pkl`** (rename from the Starter Kit if needed).
 
 ---
 
