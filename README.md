@@ -26,7 +26,7 @@ To install the required packages, run:
 
 ```console
 # Create environment (example with conda)
-conda create -n crypto_forecast python=3.9
+conda create -n crypto_forecast python=3.10
 conda activate crypto_forecast
 
 # Install PyTorch (choose CUDA version as needed)
