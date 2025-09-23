@@ -60,7 +60,7 @@ For this challenge, the training and test data are located at [data/](data/).
   * Each row has: 
 
     * `window_id`: identifier for each training window 
-    * `time_step`: 0..59 for input part 
+    * `time_step`: minute index within the window (ranging from 0 to 59)
     * `close`: closing price 
     * `volume`: traded volume
 
@@ -74,16 +74,26 @@ Submission format is described below.
 
 ## Sample Submission
 
-We provide a sample submission file at [sample\_submission/](sample_submission/) which includes:
+A minimal example is provided in `sample_submission/` with the following files (no subfolders inside the zip):
 
-* **`submission_example.pkl`**: A DataFrame with the following columns:
+* **`submission_example.pkl`**
+  Pandas DataFrame with columns:
 
-  * `window_id`: ID of each forecast window
-  * `time_step`: horizon step (0..9 for 10 minutes ahead)
-  * `pred_close`: your predicted close price
+  * `window_id` — integer ID of each forecast window
+  * `time_step` — integer horizon step **0–9** (next 10 minutes)
+  * `pred_close` — float predicted closing price
+    **Shape requirement:** each `window_id` must appear in **exactly 10 rows** with `time_step=0..9`.
 
-**Shape requirement**: For each `window_id`, there must be exactly 10 rows with `time_step=0..9`.
+* **`model.py`**
+  Defines your model and loading logic. Must expose `init_model()` that returns a ready-to-infer model (other DL frameworks are fine if the same I/O interface is respected).
 
+* **`model_weights.pkl`**
+  Serialized weights/checkpoint loadable by `model.py`.
+
+* **`inference.py`** (optional)
+  If you use extra pre/post-processing, include `generate_forecast(x_test_path)` that produces `submission.pkl`.
+
+Please ensure your archive is named submission.zip and the forecast file inside is exactly submission.pkl (rename from the Starter Kit if needed).
 ---
 
 ## Quickstart
