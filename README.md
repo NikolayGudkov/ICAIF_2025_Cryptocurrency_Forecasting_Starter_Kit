@@ -4,7 +4,7 @@
 
 
 
-Welcome to the **ACM ICAIF 2025 Cryptocurrency Forecasting Competition** Starter Kit repository. It provides a standard pipeline to help you quickly get started with the competition. For more details about the competition, please refer to the [Competition Website](https://hackathon.deepintomlf.ai/competitions/93).
+Welcome to the **ACM ICAIF 2025 Cryptocurrency Forecasting Competition** Starter Kit repository. It provides a standard pipeline to help you quickly get started with the competition. For more details about the competition, please refer to the [Competition Website](https://hackathon2.deepintomlf.ai/competitions/93/).
 
 
 
