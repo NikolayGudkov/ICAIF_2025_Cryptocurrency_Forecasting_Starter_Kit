@@ -53,16 +53,18 @@ class TrainWindowSampler:
     def iter_windows(self) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
         """
         Yield (X, y) where:
-          X: (60, 2) float32 -> columns [close, volume]
-          y: (10,)  float32 -> close only
+        X: (60, 2) float32 -> columns [close, volume]
+        y: (10,)  float32 -> close only
         """
         for g in self.groups.values():
             n = len(g)
             if n < self.window:
                 continue
-            start_indices = range(0, n - self.window + 1, self.step_size)
-            for s in start_indices:
-                chunk = g.iloc[s:s+self.window]
-                x = chunk.iloc[:self.input_len][['close','volume']].to_numpy(np.float32)
-                y = chunk.iloc[self.input_len:][['close']].to_numpy(np.float32).reshape(-1)
+
+            arr = g[['close', 'volume']].to_numpy(np.float32)  # shape: (n, 2)
+
+            for s in range(0, n - self.window + 1, self.step_size):
+                chunk = arr[s:s + self.window]            
+                x = chunk[:self.input_len]             
+                y = chunk[self.input_len:, 0]           
                 yield x, y
