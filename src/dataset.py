@@ -61,10 +61,11 @@ class TrainWindowSampler:
             if n < self.window:
                 continue
 
-            arr = g[['close', 'volume']].to_numpy(np.float32)  # shape: (n, 2)
+            arr = g[['close', 'volume']].to_numpy(np.float32)  
 
             for s in range(0, n - self.window + 1, self.step_size):
-                chunk = arr[s:s + self.window]            
-                x = chunk[:self.input_len]             
-                y = chunk[self.input_len:, 0]           
+
+                chunk = arr[s:s + self.window]               
+                x = chunk[:self.input_len]                   
+                y = chunk[self.input_len:, 0]                 
                 yield x, y
