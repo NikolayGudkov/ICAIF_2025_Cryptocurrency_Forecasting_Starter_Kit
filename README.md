@@ -41,7 +41,7 @@ pip install -r requirements.txt
 
 Dataset can be obtained in two ways:
 
-1. From the [Competition Homepage Files Phase](https://hackathon2.deepintomlf.ai/competitions/93/)  
+1. From the [Competition Homepage (Files Phase)](https://hackathon2.deepintomlf.ai/competitions/93/)  
    Download the `inputdata` package.
 
 2. Using Git LFS:
