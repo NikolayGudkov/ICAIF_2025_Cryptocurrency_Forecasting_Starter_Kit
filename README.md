@@ -51,8 +51,6 @@ Dataset can be obtained in two ways:
    git lfs pull
    ```
 
-Data integrity can be verified using data/dataset_info.json.
-
 
 For this challenge, the training and test data are located at [./data/](./data/).
 
