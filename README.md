@@ -39,6 +39,21 @@ pip install -r requirements.txt
 
 ## Data
 
+Dataset can be obtained in two ways:
+
+1. From the [Competition Homepage Files Phase](https://hackathon2.deepintomlf.ai/competitions/93/)  
+   Download the `inputdata` package.
+
+2. Using Git LFS:
+   ```bash
+   git lfs install
+   git clone https://github.com/MilleXi/ICAIF_2025_Cryptocurrency_Forecasting_Starter_Kit.git
+   git lfs pull
+   ```
+
+Data integrity can be verified using data/dataset_info.json.
+
+
 For this challenge, the training and test data are located at [./data/](./data/).
 
 * **Training set**:
