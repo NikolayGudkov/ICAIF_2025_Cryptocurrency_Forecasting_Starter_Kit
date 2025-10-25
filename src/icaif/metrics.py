@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 from typing import Dict, Tuple
-from trading import CSM, LOTQ, PW
+from icaif.trading import CSM, LOTQ, PW
 
 # ----------------- Utility -----------------s
 def _base_from_x_test(x_test: pd.DataFrame) -> pd.DataFrame:

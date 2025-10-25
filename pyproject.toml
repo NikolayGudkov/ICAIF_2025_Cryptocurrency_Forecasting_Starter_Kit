@@ -1,0 +1,38 @@
+[project]
+name = "icaif"
+version="1.0.0"
+requires-python = "==3.12.*"
+
+dependencies = [
+  "torch>=2.6,<2.7",
+  "torchvision>=0.21,<0.22",
+  "torchaudio>=2.6,<2.7",
+  "keras_sig @ git+ssh://git@github-tp/Paduce/keras_sig.git",
+  "athenea @ git+ssh://git@github-tp/Paduce/athenea.git@dev",
+  "jax[cuda12]",
+  "ipykernel",
+  "numpy>=1.21",
+  "pandas>=1.3",
+  "scipy>=1.7",
+  "tqdm>=4.64",
+  "statsmodels",
+  "tensorflow",
+  "scikit-learn",
+  "matplotlib",
+]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu124", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }]
+torchvision = [{ index = "pytorch-cu124", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }]
+torchaudio = [{ index = "pytorch-cu124", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }]
+
+# Define the CUDA 12.4 wheel index and make it explicit so only the pinned
+# packages above use it (everything else stays on PyPI).
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[build-system]
+requires = ["uv_build>=0.8.0,<0.9"]
+build-backend = "uv_build"
