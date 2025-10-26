@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from typing import Iterator, Tuple, Optional, Dict, Any
+from torch.utils.data import Dataset
+from numpy.lib.stride_tricks import sliding_window_view
 
 class TrainWindowSampler:
     """
@@ -9,7 +11,8 @@ class TrainWindowSampler:
     """
     def __init__(
         self,
-        train_path: str,
+        df : pd.DataFrame,
+        train_path: str = None,
         window: int = 70,
         input_len: int = 60,
         horizon_len: int = 10,
@@ -26,7 +29,11 @@ class TrainWindowSampler:
         if step_size is not None:
             self.step_size = step_size
 
-        self.df = pd.read_pickle(train_path)
+        if train_path is not None:
+            self.df = pd.read_pickle(train_path)
+        else:
+            self.df = df
+
         # Expect columns: ['series_id','time_step','close','volume']
         required = {'series_id','time_step','close','volume'}
         if not required.issubset(self.df.columns):
@@ -69,3 +76,43 @@ class TrainWindowSampler:
                 x = chunk[:self.input_len]                   
                 y = chunk[self.input_len:, 0]                 
                 yield x, y
+
+class TrainWindowSamplerVect:
+    """
+    Holds configuration and grouped data for the vectorized dataset.
+    """
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        train_path: str = None,
+        window: int = 70,
+        input_len: int = 60,
+        horizon_len: int = 10,
+        rolling: bool = True,
+        step_size: int = 1,
+        seed: int = 42,
+    ) -> None:
+        assert input_len + horizon_len == window, "window must equal input_len + horizon_len"
+        self.input_len = input_len
+        self.horizon_len = horizon_len
+        self.window = window
+        self.rolling = rolling
+        self.step_size = 1 if rolling else window
+        if step_size is not None:
+            self.step_size = step_size
+
+        if train_path is not None:
+            self.df = pd.read_pickle(train_path)
+        else:
+            self.df = df
+
+        # Now require event_time too
+        required = {'series_id', 'time_step', 'close', 'volume', 'event_time'}
+        if not required.issubset(self.df.columns):
+            raise ValueError(f"train missing columns {required - set(self.df.columns)}, found {self.df.columns}")
+
+        # Group per series
+        self.groups = {
+            sid: g.sort_values('time_step').reset_index(drop=True)
+            for sid, g in self.df.groupby('series_id')
+        }
