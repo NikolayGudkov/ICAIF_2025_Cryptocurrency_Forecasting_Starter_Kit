@@ -53,17 +53,17 @@ else:
     print("dataset_info.json not found at", info_path)
 
 # Peek train / x_test
-train_path = DATA / "train.pkl"
+train_path = DATA / "train.parquet"
 x_test_path  = DATA / "x_test.pkl"
 y_local_path = DATA / "y_test_local.pkl"
 
-train = pd.read_pickle(train_path)
-x_test  = pd.read_pickle(x_test_path)
-y_test_local = pd.read_pickle(y_local_path)
+train = pd.read_parquet(train_path)
+# x_test  = pd.read_pickle(x_test_path)
+# y_test_local = pd.read_pickle(y_local_path)
 
 print("train shape:", train.shape, "| columns:", train.columns.tolist())
-print("x_test  shape:", x_test.shape,  "| columns:", x_test.columns.tolist())
-print("y_test_local shape:", y_test_local.shape, "| columns:", y_test_local.columns.tolist())
+# print("x_test  shape:", x_test.shape,  "| columns:", x_test.columns.tolist())
+# print("y_test_local shape:", y_test_local.shape, "| columns:", y_test_local.columns.tolist())
 #
 # display(train.head(3))
 # display(x_test.head(3))
@@ -108,7 +108,7 @@ MAX_SAMPLES = 50000  # set to None to use all windows
 train_ds = WindowsDataset(str(train_path), rolling=True, step_size=1, max_samples=MAX_SAMPLES)
 len(train_ds), train_ds.X.shape, train_ds.y.shape
 # #%%
-# ARIMA baseline
+# # ARIMA baseline
 from src.baselines.arima import ARIMABaseline
 
 ari = ARIMABaseline(order=(1,1,0), maxiter=50)

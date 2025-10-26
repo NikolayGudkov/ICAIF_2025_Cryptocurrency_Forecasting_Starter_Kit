@@ -1,6 +1,13 @@
 import numpy as np
 import pandas as pd
 from typing import Iterator, Tuple, Optional, Dict, Any
+from torch.utils.data import Dataset
+import torch
+
+SEED = 1337
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+
 
 class TrainWindowSampler:
     """
@@ -26,7 +33,7 @@ class TrainWindowSampler:
         if step_size is not None:
             self.step_size = step_size
 
-        self.df = pd.read_pickle(train_path)
+        self.df = pd.read_parquet(train_path)
         # Expect columns: ['series_id','time_step','close','volume']
         required = {'series_id','time_step','close','volume'}
         if not required.issubset(self.df.columns):
@@ -69,3 +76,35 @@ class TrainWindowSampler:
                 x = chunk[:self.input_len]                   
                 y = chunk[self.input_len:, 0]                 
                 yield x, y
+
+
+class WindowsDataset(Dataset):
+    """
+    Wrap TrainWindowSampler into a PyTorch Dataset.
+    Returns:
+      X: (60, 2) float32 -> [close, volume]
+      y: (10,)  float32 -> future close
+    """
+    def __init__(self, train_path: str, rolling: bool = True, step_size: int = 1, max_samples: int = None):
+        self.sampler = TrainWindowSampler(
+            train_path=train_path,
+            window=70,
+            input_len=60,
+            horizon_len=10,
+            rolling=rolling,
+            step_size=step_size,
+            seed=SEED,
+        )
+        # Materialize (optionally capped) for stable batching
+        xs, ys = [], []
+        for i, (X, y) in enumerate(self.sampler.iter_windows()):
+            xs.append(X.astype(np.float32))
+            ys.append(y.astype(np.float32))
+            if max_samples is not None and (i + 1) >= max_samples:
+                break
+        self.X = np.stack(xs, axis=0) if xs else np.zeros((0,60,2), dtype=np.float32)
+        self.y = np.stack(ys, axis=0) if ys else np.zeros((0,10), dtype=np.float32)
+
+    def __len__(self):  return len(self.X)
+    def __getitem__(self, i):
+        return torch.from_numpy(self.X[i]), torch.from_numpy(self.y[i])
