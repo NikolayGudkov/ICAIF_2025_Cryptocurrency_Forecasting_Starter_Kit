@@ -412,7 +412,7 @@ if __name__ == "__main__":
 
     DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    raw_data = pd.read_parquet('../data/train.parquet')
+    raw_data = pd.read_parquet('./data/train.parquet')
 
     train_data = raw_data[raw_data['series_id']<40]
     test_data = raw_data[raw_data['series_id']>=40]
