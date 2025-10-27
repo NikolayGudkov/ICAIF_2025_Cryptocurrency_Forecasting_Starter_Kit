@@ -16,13 +16,14 @@ class TrainWindowSampler:
     """
     def __init__(
         self,
-        train_path: str,
+        train_path: str = None,
         window: int = 70,
         input_len: int = 60,
         horizon_len: int = 10,
         rolling: bool = True,
         step_size: int = 1,
         seed: int = 42,
+        df: pd.DataFrame = None
     ) -> None:
         assert input_len + horizon_len == window, "window must equal input_len + horizon_len"
         self.input_len = input_len
@@ -33,7 +34,11 @@ class TrainWindowSampler:
         if step_size is not None:
             self.step_size = step_size
 
-        self.df = pd.read_parquet(train_path)
+        if df is None:
+            self.df = pd.read_parquet(train_path)
+        else:
+            self.df = df
+
         # Expect columns: ['series_id','time_step','close','volume']
         required = {'series_id','time_step','close','volume'}
         if not required.issubset(self.df.columns):
@@ -85,7 +90,7 @@ class WindowsDataset(Dataset):
       X: (60, 2) float32 -> [close, volume]
       y: (10,)  float32 -> future close
     """
-    def __init__(self, train_path: str, rolling: bool = True, step_size: int = 1, max_samples: int = None):
+    def __init__(self, train_path: str = None, rolling: bool = True, step_size: int = 1, max_samples: int = None, df: pd.DataFrame = None):
         self.sampler = TrainWindowSampler(
             train_path=train_path,
             window=70,
@@ -94,6 +99,7 @@ class WindowsDataset(Dataset):
             rolling=rolling,
             step_size=step_size,
             seed=SEED,
+            df=df
         )
         # Materialize (optionally capped) for stable batching
         xs, ys = [], []
@@ -102,6 +108,7 @@ class WindowsDataset(Dataset):
             ys.append(y.astype(np.float32))
             if max_samples is not None and (i + 1) >= max_samples:
                 break
+
         self.X = np.stack(xs, axis=0) if xs else np.zeros((0,60,2), dtype=np.float32)
         self.y = np.stack(ys, axis=0) if ys else np.zeros((0,10), dtype=np.float32)
 
