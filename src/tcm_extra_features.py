@@ -438,8 +438,8 @@ if __name__ == "__main__":
     val_df = pd.concat(val_df, axis=0)
 
 
-    train_samples = WindowsDataset(rolling=True, step_size=5, max_samples=MAX_SAMPLES_tr, df=tr_df)
-    val_samples = WindowsDataset(rolling=True, step_size=20, max_samples=MAX_SAMPLES_tr, df=val_df)
+    train_samples = WindowsDataset(rolling=True, step_size=1, max_samples=MAX_SAMPLES_tr, df=tr_df)
+    val_samples = WindowsDataset(rolling=True, step_size=1, max_samples=MAX_SAMPLES_tr, df=val_df)
 
     from src.features_compute import build_features_np
 
