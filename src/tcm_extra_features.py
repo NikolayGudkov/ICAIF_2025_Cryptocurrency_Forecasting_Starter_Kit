@@ -417,7 +417,7 @@ if __name__ == "__main__":
     train_data = raw_data[raw_data['series_id']<40]
     test_data = raw_data[raw_data['series_id']>=40]
 
-    MAX_SAMPLES_tr = 1e4
+    MAX_SAMPLES_tr = 1e5
     MAX_SAMPLES_val = 1e3
 
     val_prc = 0.2
