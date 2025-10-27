@@ -427,7 +427,7 @@ if __name__ == "__main__":
 
     tr_df, val_df = [], []
     for g in train_groups.values():
-        g['event_timestamp'] = pd.date_range(start="2025-01-01", periods=g.shape[0], freq='T')
+        #g['event_timestamp'] = pd.date_range(start="2025-01-01", periods=g.shape[0], freq='T')
         df_size = g.shape[0] - T_in - steps + 1
         val_size = int(val_prc * df_size)
         train_size = df_size - val_size - offset
@@ -438,7 +438,7 @@ if __name__ == "__main__":
     val_df = pd.concat(val_df, axis=0)
 
 
-    train_samples = WindowsDataset(rolling=True, step_size=20, max_samples=MAX_SAMPLES_tr, df=tr_df)
+    train_samples = WindowsDataset(rolling=True, step_size=5, max_samples=MAX_SAMPLES_tr, df=tr_df)
     val_samples = WindowsDataset(rolling=True, step_size=20, max_samples=MAX_SAMPLES_tr, df=val_df)
 
     from src.features_compute import build_features_np
