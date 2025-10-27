@@ -1,153 +1,188 @@
 """
-Cross-sectional strategies for the 60->10 task that DO NOT require x_test.
-Requirements:
-  y_true must contain columns: ['window_id','time_step','close','base_close']
-  y_pred must contain columns: ['window_id','time_step','pred_close']
-Strategies:
-  - CSM (Cross-Sectional Momentum): long top decile by predicted returns,
-    short bottom decile (equal-weight).
-  - LOTQ (Long-Only Top-Quantile): long-only top 20% by predicted returns
-    (equal-weight), zero elsewhere.
-  - PW (Proportional-Weighting): long-only; weights are proportional to
-    predicted returns at the horizon. Emphasizes magnitude instead of rank.
+Cross-sectional trading strategies
+Aligned with evaluate.py evaluation logic
 """
 
-from typing import List
 import numpy as np
 import pandas as pd
 
-# --------------------------- Utilities ---------------------------
-
-def _need(df: pd.DataFrame, cols: List[str], name: str):
-    miss = [c for c in cols if c not in df.columns]
-    if miss:
-        raise ValueError(f"{name} missing columns: {miss}. Found: {df.columns.tolist()}")
-
-def _returns_truth_pred_at_h(
-    y_true: pd.DataFrame,
-    y_pred: pd.DataFrame,
-    horizon_step: int,
-) -> pd.DataFrame:
+# --------------------------- Core Utility ---------------------------
+def _simple_returns_base(y_true: pd.DataFrame, y_pred: pd.DataFrame, x_test: pd.DataFrame):
     """
-    Build a dataframe for a single horizon_step with columns:
-      ['window_id','pred_ret','true_ret'].
-    Returns are computed relative to base_close supplied in y_true.
+    Simple return relative to previous time step:
+      true_ret(t) = true_close(t) / true_close(t-1) - 1
+      pred_ret(t) = pred_close(t) / true_close(t-1) - 1
     """
-    if horizon_step < 0:
-        raise ValueError("horizon_step must be >= 0")
-    _need(y_true, ['window_id','time_step','close','base_close'], 'y_true')
-    _need(y_pred, ['window_id','time_step','pred_close'], 'y_pred')
+    # Merge y_true and x_test to get both current and previous prices
+    tr = y_true.copy().sort_values(["window_id", "time_step"])
+    pr = y_pred.copy().sort_values(["window_id", "time_step"])
 
-    t = y_true[y_true['time_step'] == horizon_step][['window_id','close','base_close']].copy()
-    p = y_pred[y_pred['time_step'] == horizon_step][['window_id','pred_close']].copy()
-    if t.empty or p.empty:
-        raise ValueError("No rows found at the given horizon_step in y_true/y_pred.")
+    # Get all x_test data (historical prices)
+    x_all = x_test[["window_id", "time_step", "close"]].copy()
+    x_all = x_all.sort_values(["window_id", "time_step"])
 
-    t['true_ret'] = t['close'] / (t['base_close'] + 1e-12) - 1.0
-    p = p.merge(t[['window_id','base_close']], on='window_id', how='inner')
-    p['pred_ret'] = p['pred_close'] / (p['base_close'] + 1e-12) - 1.0
+    # For each row in y_true/y_pred, find the previous time step's true price
+    # Combine x_test and y_true to get full price history
+    full_prices = pd.concat([
+        x_all.rename(columns={"close": "price"}),
+        tr[["window_id", "time_step", "close"]].rename(columns={"close": "price"})
+    ]).sort_values(["window_id", "time_step"])
 
-    df = p[['window_id','pred_ret']].merge(t[['window_id','true_ret']], on='window_id', how='inner')
-    return df  # one row per window_id at the chosen horizon
+    # Create previous price column
+    full_prices["prev_price"] = full_prices.groupby("window_id")["price"].shift(1)
 
-# --------------------------- Strategies ---------------------------
+    # Merge previous prices back to true and pred
+    prev_prices = full_prices[["window_id", "time_step", "prev_price"]].dropna()
 
-def CSM(
-    y_true: pd.DataFrame,
-    y_pred: pd.DataFrame,
-    horizon_step: int = 0,
-    top_decile: float = 0.10,
-) -> np.ndarray:
+    tr = tr.merge(prev_prices, on=["window_id", "time_step"], how="inner")
+    pr = pr.merge(prev_prices, on=["window_id", "time_step"], how="inner")
+
+    eps = 1e-12
+    tr["true_ret"] = tr["close"] / (tr["prev_price"] + eps) - 1.0
+    pr["pred_ret"] = pr["pred_close"] / (pr["prev_price"] + eps) - 1.0
+
+    pr = pr[["window_id", "time_step", "pred_ret"]]
+    return tr, pr
+
+# --------------------------- Portfolio Strategies per Timestamp ---------------------------
+def _portfolio_csm(g: pd.DataFrame, top_decile: float = 0.10) -> float:
     """
-    Cross-Sectional Momentum (long-short):
-      - Long equal-weight the top decile by predicted returns.
-      - Short equal-weight the bottom decile by predicted returns.
-      - Portfolio return = mean(true_ret of long) - mean(true_ret of short).
-    Returns an array of realized portfolio returns across the cross section
-    (one scalar here for the chosen horizon).
+    Cross-Sectional Momentum: long top 10%, short bottom 10% (equal-weighted)
     """
-    df = _returns_truth_pred_at_h(y_true, y_pred, horizon_step)
-    q_hi = np.quantile(df['pred_ret'].to_numpy(), 1.0 - top_decile)
-    q_lo = np.quantile(df['pred_ret'].to_numpy(), top_decile)
+    if len(g) < max(10, int(1/top_decile) + int(1/top_decile)):
+        return 0.0
+    q_hi = np.quantile(g["pred_ret"], 1.0 - top_decile)
+    q_lo = np.quantile(g["pred_ret"], top_decile)
+    long_ret  = g.loc[g["pred_ret"] >= q_hi, "true_ret"].mean()
+    short_ret = g.loc[g["pred_ret"] <= q_lo, "true_ret"].mean()
+    val = float(long_ret - short_ret)
+    return val if np.isfinite(val) else 0.0
 
-    long_leg = df[df['pred_ret'] >= q_hi]
-    short_leg = df[df['pred_ret'] <= q_lo]
-
-    long_ret = float(long_leg['true_ret'].mean()) if len(long_leg) else 0.0
-    short_ret = float(short_leg['true_ret'].mean()) if len(short_leg) else 0.0
-
-    port_ret = long_ret - short_ret
-    return np.array([port_ret], dtype=np.float64)
-
-def LOTQ(
-    y_true: pd.DataFrame,
-    y_pred: pd.DataFrame,
-    horizon_step: int = 0,
-    top_quantile: float = 0.20,
-) -> np.ndarray:
+def _portfolio_lotq(g: pd.DataFrame, top_q: float = 0.20) -> float:
     """
-    Long-Only Top-Quantile:
-      - Long equal-weight the top 'top_quantile' by predicted returns.
-      - Zero exposure to others.
-    Returns an array with one realized portfolio return for the chosen horizon.
+    Long-Only Top Quantile: long top 20% (equal-weighted)
     """
-    df = _returns_truth_pred_at_h(y_true, y_pred, horizon_step)
-    thr = np.quantile(df['pred_ret'].to_numpy(), 1.0 - top_quantile)
-    long_leg = df[df['pred_ret'] >= thr]
-    long_ret = float(long_leg['true_ret'].mean()) if len(long_leg) else 0.0
-    return np.array([long_ret], dtype=np.float64)
+    if len(g) < max(5, int(1/top_q)):
+        return 0.0
+    thr = np.quantile(g["pred_ret"], 1.0 - top_q)
+    long_ret = g.loc[g["pred_ret"] >= thr, "true_ret"].mean()
+    val = float(long_ret)
+    return val if np.isfinite(val) else 0.0
 
-def PW(
-    y_true: pd.DataFrame,
-    y_pred: pd.DataFrame,
-    horizon_step: int = 0,
-    clip_negative: bool = False,   # default: signed weights
-    eps: float = 1e-12,
-) -> np.ndarray:
+def _portfolio_pw(g: pd.DataFrame) -> float:
     """
-    Proportional-Weighting (PW):
-      - Allocate portfolio weights proportional to predicted returns.
-      - Default uses signed weights (allowing long/short).
-      - Portfolio return = weighted sum of true returns with proportional weights.
-    Returns an array with one realized portfolio return for the chosen horizon.
+    Proportional Weighting: long-only, weighted by positive pred_ret
     """
-    df = _returns_truth_pred_at_h(y_true, y_pred, horizon_step)
-    rhat = df['pred_ret'].to_numpy().astype(np.float64)
+    rhat = np.maximum(g["pred_ret"].to_numpy(), 0.0)
+    denom = rhat.sum()
+    if denom <= 0.0:
+        return 0.0
+    w = rhat / denom
+    true = g["true_ret"].to_numpy()
+    val = float(np.sum(w * true))
+    return val if np.isfinite(val) else 0.0
 
-    if clip_negative:
-        rhat = np.maximum(rhat, 0.0)
-        denom = rhat.sum()
-        if denom <= eps:
-            return np.array([0.0], dtype=np.float64)
-        w = rhat / denom
-    else:
-        # Signed weights: normalize by L1 norm to avoid degenerate denominator
-        denom = np.sum(np.abs(rhat))
-        if denom <= eps:
-            return np.array([0.0], dtype=np.float64)
-        w = rhat / denom
-
-    realized = float((w * df['true_ret'].to_numpy().astype(np.float64)).sum())
-    return np.array([realized], dtype=np.float64)
-
-# --------------------------- Convenience ---------------------------
-
-def run_strategy(
-    name: str,
-    y_true: pd.DataFrame,
-    y_pred: pd.DataFrame,
-    horizon_step: int = 0,
-) -> np.ndarray:
+# --------------------------- Strategy Time Series Builder ---------------------------
+def _portfolio_series(y_true: pd.DataFrame, y_pred: pd.DataFrame,
+                      x_test: pd.DataFrame, strat: str) -> np.ndarray:
     """
-    Dispatch a strategy by name: 'CSM', 'LOTQ', or 'PW'.
-    Returns the realized portfolio return series (np.ndarray).
+    Build time series of portfolio returns using specified strategy.
+    Groups by event_datetime and computes cross-sectional portfolio return per timestamp.
     """
-    key = name.upper()
-    if key == 'CSM':
-        return CSM(y_true, y_pred, horizon_step=horizon_step)
-    elif key == 'LOTQ':
-        return LOTQ(y_true, y_pred, horizon_step=horizon_step)
-    elif key in ('PW', 'PROPORTIONAL', 'S3'):
-        return PW(y_true, y_pred, horizon_step=horizon_step)
+    tr, pr = _simple_returns_base(y_true, y_pred, x_test)
+    if "event_datetime" not in tr.columns:
+        return np.array([])
+    df = tr.merge(pr, on=["window_id","time_step"], how="inner")
+    df["event_datetime"] = pd.to_datetime(df["event_datetime"], utc=True, errors="coerce")
+
+    rets = []
+    for ts, g in df.groupby("event_datetime", dropna=True):
+        if len(g) < 3:
+            continue
+        if strat == "csm":
+            r = _portfolio_csm(g)
+        elif strat == "lotq":
+            r = _portfolio_lotq(g)
+        elif strat == "pw":
+            r = _portfolio_pw(g)
+        else:
+            raise ValueError(f"Unknown strategy: {strat}")
+        rets.append((ts, r))
+
+    if not rets:
+        return np.array([])
+    # Sort by timestamp and return the series
+    rets = np.array([r for _, r in sorted(rets, key=lambda x: x[0])], dtype=float)
+    return rets
+
+# --------------------------- Public Strategy Functions ---------------------------
+def CSM(y_true: pd.DataFrame, y_pred: pd.DataFrame, x_test: pd.DataFrame,
+        top_decile: float = 0.10) -> np.ndarray:
+    """
+    Cross-Sectional Momentum (long-short) strategy.
+
+    Args:
+        y_true: Must contain [window_id, time_step, close, event_datetime]
+        y_pred: Must contain [window_id, time_step, pred_close]
+        x_test: Must contain [window_id, time_step, close]
+        top_decile: Top/bottom quantile to trade (default 0.10 for 10%)
+
+    Returns:
+        Array of portfolio returns over time
+    """
+    return _portfolio_series(y_true, y_pred, x_test, "csm")
+
+def LOTQ(y_true: pd.DataFrame, y_pred: pd.DataFrame, x_test: pd.DataFrame,
+         topq: float = 0.20) -> np.ndarray:
+    """
+    Long-Only Top Quantile strategy (equal-weighted).
+
+    Args:
+        y_true: Must contain [window_id, time_step, close, event_datetime]
+        y_pred: Must contain [window_id, time_step, pred_close]
+        x_test: Must contain [window_id, time_step, close]
+        topq: Top quantile to go long (default 0.20 for top 20%)
+
+    Returns:
+        Array of portfolio returns over time
+    """
+    return _portfolio_series(y_true, y_pred, x_test, "lotq")
+
+def PW(y_true: pd.DataFrame, y_pred: pd.DataFrame, x_test: pd.DataFrame) -> np.ndarray:
+    """
+    Proportional Weighting strategy (long-only, weighted by predicted return magnitude).
+
+    Args:
+        y_true: Must contain [window_id, time_step, close, event_datetime]
+        y_pred: Must contain [window_id, time_step, pred_close]
+        x_test: Must contain [window_id, time_step, close]
+
+    Returns:
+        Array of portfolio returns over time
+    """
+    return _portfolio_series(y_true, y_pred, x_test, "pw")
+
+# --------------------------- Dispatcher ---------------------------
+def run_strategy(name: str, y_true: pd.DataFrame, y_pred: pd.DataFrame,
+                 x_test: pd.DataFrame) -> np.ndarray:
+    """
+    Run a strategy by name.
+
+    Args:
+        name: Strategy name ('CSM', 'LOTQ', 'PW')
+        y_true: Must contain [window_id, time_step, close, event_datetime]
+        y_pred: Must contain [window_id, time_step, pred_close]
+        x_test: Must contain [window_id, time_step, close]
+
+    Returns:
+        Array of portfolio returns over time
+    """
+    name = name.upper()
+    if name == 'CSM':
+        return CSM(y_true, y_pred, x_test)
+    elif name == 'LOTQ':
+        return LOTQ(y_true, y_pred, x_test)
+    elif name in ('PW', 'PROPORTIONAL'):
+        return PW(y_true, y_pred, x_test)
     else:
         raise ValueError(f"Unknown strategy: {name}")
