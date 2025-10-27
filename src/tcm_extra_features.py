@@ -439,7 +439,7 @@ if __name__ == "__main__":
 
 
     train_samples = WindowsDataset(rolling=True, step_size=1, max_samples=MAX_SAMPLES_tr, df=tr_df)
-    val_samples = WindowsDataset(rolling=True, step_size=1, max_samples=MAX_SAMPLES_tr, df=val_df)
+    val_samples = WindowsDataset(rolling=True, step_size=1, max_samples=MAX_SAMPLES_val, df=val_df)
 
     from src.features_compute import build_features_np
 
