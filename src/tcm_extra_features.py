@@ -286,7 +286,7 @@ class SigPathLoss(nn.Module):
 
 @dataclass
 class Config:
-    d_in: int = 42          # set after building dataset: d or 2*d (if mask channels enabled)
+    d_in: int = None         # set after building dataset: d or 2*d (if mask channels enabled)
     steps: int = 10
     batch_size: int = 128
     lr: float = 3e-4
@@ -333,14 +333,14 @@ def train(
     X_val: torch.Tensor,
     Y_val: torch.Tensor,
     price_feature_index: Optional[int] = 0,
-    p0_train: Optional[torch.Tensor] = None,
-    p0_val: Optional[torch.Tensor] = None,
+    #p0_train: Optional[torch.Tensor] = None,
+    #p0_val: Optional[torch.Tensor] = None,
     cfg: Optional[Config] = None,
 ):
     train_loader, val_loader, d_in = make_loaders(
         X_train, Y_train, X_val, Y_val,
         price_feature_index=price_feature_index,
-        p0_train=p0_train, p0_val=p0_val,
+        #p0_train=p0_train, p0_val=p0_val,
         batch_size=cfg.batch_size if cfg else 128,
         num_workers=cfg.num_workers if cfg else 0,
     )
@@ -412,13 +412,13 @@ if __name__ == "__main__":
 
     DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    raw_data = pd.read_parquet('./data/train.parquet')
+    raw_data = pd.read_parquet('../data/train.parquet')
 
     train_data = raw_data[raw_data['series_id']<40]
     test_data = raw_data[raw_data['series_id']>=40]
 
-    MAX_SAMPLES_tr = 1e5
-    MAX_SAMPLES_val = 1e3
+    MAX_SAMPLES_tr = 100000
+    MAX_SAMPLES_val = 10000
 
     val_prc = 0.2
 
@@ -438,18 +438,18 @@ if __name__ == "__main__":
     val_df = pd.concat(val_df, axis=0)
 
 
-    train_samples = WindowsDataset(rolling=True, step_size=1, max_samples=MAX_SAMPLES_tr, df=tr_df)
-    val_samples = WindowsDataset(rolling=True, step_size=1, max_samples=MAX_SAMPLES_val, df=val_df)
+    train_samples = WindowsDataset(rolling=True, step_size=5, max_samples=MAX_SAMPLES_tr, df=tr_df)
+    val_samples = WindowsDataset(rolling=True, step_size=5, max_samples=MAX_SAMPLES_val, df=val_df)
 
     from src.features_compute import build_features_np
 
     X_tr, Y_tr = build_features_np(X = train_samples.X), train_samples.y
     X_tr, Y_tr = torch.from_numpy(X_tr), torch.from_numpy(Y_tr)
 
-    X_va, Y_va = build_features_np(val_samples.X), val_samples.y
+    X_va, Y_va = build_features_np(X = val_samples.X), val_samples.y
     X_va, Y_va = torch.from_numpy(X_va), torch.from_numpy(Y_va)
 
-    cfg = Config(steps=steps, epochs=10)  # quick demo
+    cfg = Config(steps=steps, epochs=10, d_in=2*X_tr.shape[2])  # quick demo
 
     model = train(X_tr, Y_tr, X_va, Y_va, price_feature_index=0, cfg=cfg)
     torch.save(model.state_dict(), weights_path)

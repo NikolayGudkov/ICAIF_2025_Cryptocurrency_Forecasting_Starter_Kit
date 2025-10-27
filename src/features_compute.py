@@ -132,7 +132,7 @@ def build_features_np(X, fillna=False, eps=1e-12):
     ac1_10 = _rolling_ac1(r1, 10)
 
     # Stack features (order matters only for naming)
-    feats = [
+    feats = [price, volume,
         log_p, log_v, r1,
         mom3, mom10,
         ema3_10, ema10_30,
@@ -146,7 +146,7 @@ def build_features_np(X, fillna=False, eps=1e-12):
         r1_abs_relvol, r1_relvol,
         up_frac20, ac1_10
     ]
-    feat_names = [
+    feat_names = ['price', 'volume',
         "log_p","log_v","r1",
         "mom3","mom10",
         "ema3_10","ema10_30",
