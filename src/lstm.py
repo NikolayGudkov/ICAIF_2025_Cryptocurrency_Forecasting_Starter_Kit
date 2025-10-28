@@ -373,7 +373,7 @@ if __name__ == "__main__":
     # X_va, Y_va = torch.from_numpy(X_va), torch.from_numpy(Y_va)
 
     import pandas as pd
-    raw_data = pd.read_parquet('./data/train.parquet')
+    raw_data = pd.read_parquet('../data/train.parquet')
 
     train_data = raw_data[raw_data['series_id'] < 40]
     test_data = raw_data[raw_data['series_id'] >= 40]

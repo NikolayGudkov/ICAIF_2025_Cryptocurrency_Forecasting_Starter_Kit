@@ -15,7 +15,6 @@ import signatory
 from src.dataset import WindowsDataset
 from pathlib import Path
 import sys, warnings
-
 import pandas as pd
 
 # ==========================
@@ -29,9 +28,8 @@ def time_augment(path: torch.Tensor) -> torch.Tensor:
 
 def lead_lag(path: torch.Tensor) -> torch.Tensor:
     """Lead–lag augmentation on channels: (B,L,c)->(B,L,2c)."""
-    lead = path
-    lag = torch.cat([path[:, :1, :], path[:, :-1, :]], dim=1)
-    return torch.cat([lead, lag], dim=-1)
+    x_rep = torch.repeat_interleave(path, repeats=2, dim=1)
+    return torch.cat([x_rep[:, :-1], x_rep[:, 1:]], dim=2)[:,:,:-1]
 
 def add_basepoint(path: torch.Tensor, base_value: float = 0.0) -> torch.Tensor:
     """Prepend a basepoint row: (B,L,c)->(B,L+1,c)."""
@@ -273,16 +271,15 @@ class SigLossTCN(nn.Module):
 # Loss & Training
 # ==========================
 class SigPathLoss(nn.Module):
-    def __init__(self, lam_path: float = 0.1, lam_end: float = 0.1):
+    def __init__(self, lam_path: float = 0.1):
         super().__init__()
         self.l2 = nn.MSELoss()
-        self.lam_path, self.lam_end = lam_path, lam_end
+        self.lam_path = lam_path
 
     def forward(self, outputs: dict, y_true_levels: torch.Tensor) -> torch.Tensor:
         L_sig = self.l2(outputs["S_pred"], outputs["S_true"])
         L_path = self.l2(outputs["y_pred_levels"], y_true_levels)
-        L_end = self.l2(outputs["y_pred_levels"][:, -1], y_true_levels[:, -1])
-        return L_sig + self.lam_path * L_path + self.lam_end * L_end
+        return L_sig + self.lam_path * L_path
 
 @dataclass
 class Config:
@@ -342,12 +339,12 @@ def train(
         price_feature_index=price_feature_index,
         #p0_train=p0_train, p0_val=p0_val,
         batch_size=cfg.batch_size if cfg else 128,
-        num_workers=cfg.num_workers if cfg else 0,
+        #num_workers=cfg.num_workers if cfg else 0,
     )
 
     device = cfg.device
     model = SigLossTCN(d_in=cfg.d_in, steps=cfg.steps, logsig_depth=cfg.logsig_depth, use_logsig=cfg.use_logsig).to(device)
-    criterion = SigPathLoss(lam_path=0.1, lam_end=0.1)
+    criterion = SigPathLoss(lam_path=0.1)
     opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.epochs)
 
@@ -412,13 +409,13 @@ if __name__ == "__main__":
 
     DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    raw_data = pd.read_parquet('./data/train.parquet')
+    raw_data = pd.read_parquet('../data/train.parquet')
 
     train_data = raw_data[raw_data['series_id']<40]
     test_data = raw_data[raw_data['series_id']>=40]
 
-    MAX_SAMPLES_tr = 200000
-    MAX_SAMPLES_val = 100000
+    MAX_SAMPLES_tr = 200
+    MAX_SAMPLES_val = 100
 
     val_prc = 0.2
 
@@ -442,7 +439,6 @@ if __name__ == "__main__":
     val_samples = WindowsDataset(rolling=True, step_size=5, max_samples=MAX_SAMPLES_val, df=val_df)
 
     from src.features_compute import build_features_np
-
     X_tr, Y_tr = train_samples.X, train_samples.y
     X_tr, Y_tr = torch.from_numpy(X_tr), torch.from_numpy(Y_tr)
 
@@ -450,12 +446,13 @@ if __name__ == "__main__":
     X_va, Y_va = torch.from_numpy(X_va), torch.from_numpy(Y_va)
 
     cfg = Config(steps=steps, epochs=10, d_in=2*X_tr.shape[2])  # quick demo
-
     model = train(X_tr, Y_tr, X_va, Y_va, price_feature_index=0, cfg=cfg)
     torch.save(model.state_dict(), weights_path)
 
-    model = SigLossTCN(d_in=cfg.d_in, steps=cfg.steps, logsig_depth=cfg.logsig_depth, use_logsig=cfg.use_logsig).to(
-        DEVICE)
+    model = SigLossTCN(d_in=cfg.d_in,
+                       steps=cfg.steps,
+                       logsig_depth=cfg.logsig_depth,
+                       use_logsig=cfg.use_logsig).to(DEVICE)
     state_dict = torch.load(weights_path, map_location="cpu")
 
     # model.load_state_dict(state_dict)
