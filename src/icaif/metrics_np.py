@@ -87,6 +87,7 @@ def evaluate_all_metrics_vectorized(
     # Keep only rows usable for return-based metrics
     df = df.dropna(subset=["prev_price", "event_datetime"])
     if df.empty:
+        print(df)
         metrics = {
             "MSE": mse, "MAE": mae, "IC": 0.0, "IR": 0.0,
             "SharpeRatio": 0.0, "MDD": 0.0, "VaR": 0.0, "ES": 0.0,
