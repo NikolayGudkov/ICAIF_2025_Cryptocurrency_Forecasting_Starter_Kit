@@ -77,6 +77,8 @@ class TrainWindowSampler:
                 y = chunk[self.input_len:, 0]                 
                 yield x, y
 
+
+
 class TrainWindowSamplerVect:
     """
     Holds configuration and grouped data for the vectorized dataset.
@@ -106,13 +108,11 @@ class TrainWindowSamplerVect:
         else:
             self.df = df
 
-        # Now require event_time too
-        required = {'series_id', 'time_step', 'close', 'volume', 'event_time'}
+        required = {"series_id", "time_step", "close", "volume", "event_datetime"}
         if not required.issubset(self.df.columns):
             raise ValueError(f"train missing columns {required - set(self.df.columns)}, found {self.df.columns}")
 
-        # Group per series
         self.groups = {
-            sid: g.sort_values('time_step').reset_index(drop=True)
-            for sid, g in self.df.groupby('series_id')
+            sid: g.sort_values("time_step").reset_index(drop=True)
+            for sid, g in self.df.groupby("series_id")
         }
