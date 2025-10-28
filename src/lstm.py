@@ -334,7 +334,7 @@ def train(
 # ==========================
 if __name__ == "__main__":
     torch.manual_seed(0)
-    N_train, N_val, T_in, d, steps = 2048, 512, 60, 21, 10
+    N_train, N_val, T_in, d, steps = 2048, 512, 60, 2, 10
 
     # Paths (adjust if your layout differs)
     ROOT = Path.cwd().parent if (Path.cwd().name == 'src') else Path.cwd()
@@ -358,20 +358,56 @@ if __name__ == "__main__":
 
     DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    MAX_SAMPLES = 10000
-    train_size = 4000#int(0.9 * MAX_SAMPLES)# set to None to use all windows
-    val_size = 1000
-    train_ds = WindowsDataset(str(train_path), rolling=True, step_size=1, max_samples=MAX_SAMPLES)
+    # MAX_SAMPLES = 10000
+    # train_size = 4000#int(0.9 * MAX_SAMPLES)# set to None to use all windows
+    # val_size = 1000
+    # train_ds = WindowsDataset(str(train_path), rolling=True, step_size=1, max_samples=MAX_SAMPLES)
+    #
+    # from src.features_compute import build_features_np
+    #
+    # X_tr, Y_tr = build_features_np(X = train_ds.X[:train_size]), train_ds.y[:train_size]
+    # X_tr, Y_tr = torch.from_numpy(X_tr), torch.from_numpy(Y_tr)
+    #
+    # idx = np.random.randint(low=train_size, high=MAX_SAMPLES, size=val_size)
+    # X_va, Y_va = build_features_np(train_ds.X[idx]), train_ds.y[idx]
+    # X_va, Y_va = torch.from_numpy(X_va), torch.from_numpy(Y_va)
+
+    import pandas as pd
+    raw_data = pd.read_parquet('./data/train.parquet')
+
+    train_data = raw_data[raw_data['series_id'] < 40]
+    test_data = raw_data[raw_data['series_id'] >= 40]
+
+    MAX_SAMPLES_tr = 200000
+    MAX_SAMPLES_val = 100000
+
+    val_prc = 0.2
+    offset = 70
+    train_groups = {sid: g.sort_values('time_step').reset_index(drop=True)
+                    for sid, g in train_data.groupby('series_id')}
+
+    tr_df, val_df = [], []
+    for g in train_groups.values():
+        # g['event_timestamp'] = pd.date_range(start="2025-01-01", periods=g.shape[0], freq='T')
+        df_size = g.shape[0] - T_in - steps + 1
+        val_size = int(val_prc * df_size)
+        train_size = df_size - val_size - offset
+        tr_df.append(g.iloc[:train_size])
+        val_df.append(g.iloc[train_size + offset:])
+
+    tr_df = pd.concat(tr_df, axis=0)
+    val_df = pd.concat(val_df, axis=0)
+
+    train_samples = WindowsDataset(rolling=True, step_size=5, max_samples=MAX_SAMPLES_tr, df=tr_df)
+    val_samples = WindowsDataset(rolling=True, step_size=5, max_samples=MAX_SAMPLES_val, df=val_df)
 
     from src.features_compute import build_features_np
 
-    X_tr, Y_tr = build_features_np(X = train_ds.X[:train_size]), train_ds.y[:train_size]
+    X_tr, Y_tr = train_samples.X, train_samples.y
     X_tr, Y_tr = torch.from_numpy(X_tr), torch.from_numpy(Y_tr)
 
-    idx = np.random.randint(low=train_size, high=MAX_SAMPLES, size=val_size)
-    X_va, Y_va = build_features_np(train_ds.X[idx]), train_ds.y[idx]
+    X_va, Y_va = val_samples.X, val_samples.y
     X_va, Y_va = torch.from_numpy(X_va), torch.from_numpy(Y_va)
-
 
     cfg = Config(d_in=d, steps=steps, epochs=10)
 
