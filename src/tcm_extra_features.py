@@ -17,6 +17,7 @@ from pathlib import Path
 import sys, warnings
 import pandas as pd
 from tqdm import tqdm
+import pyarrow
 
 # ==========================
 # Path augmentations for (log-)signature
@@ -414,13 +415,16 @@ if __name__ == "__main__":
 
     DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    raw_data = pd.read_parquet('./data/train.parquet')
+    try:
+        raw_data = pd.read_parquet('./data/train.parquet')
+    except pyarrow.lib.ArrowInvalid:
+        raw_data = pd.read_pickle('./data/train.pkl')
 
     train_data = raw_data[raw_data['series_id']<40]
     test_data = raw_data[raw_data['series_id']>=40]
 
-    MAX_SAMPLES_tr = 2000000
-    MAX_SAMPLES_val = 100000
+    MAX_SAMPLES_tr = 20000
+    MAX_SAMPLES_val = 10000
 
     val_prc = 0.2
 
@@ -430,7 +434,7 @@ if __name__ == "__main__":
     tr_df, val_df = [], []
     for g in train_groups.values():
         #g['event_timestamp'] = pd.date_range(start="2025-01-01", periods=g.shape[0], freq='T')
-        df_size = g.shape[0] - T_in - forward_steps + 1
+        df_size = g.shape[0] - offset + 1
         val_size = int(val_prc * df_size)
         train_size = df_size - val_size - offset
         tr_df.append(g.iloc[:train_size])
@@ -440,8 +444,8 @@ if __name__ == "__main__":
     val_df = pd.concat(val_df, axis=0)
 
 
-    train_samples = WindowsDataset(rolling=True, step_size=1, max_samples=MAX_SAMPLES_tr, df=tr_df)
-    val_samples = WindowsDataset(rolling=True, step_size=1, max_samples=MAX_SAMPLES_val, df=val_df)
+    train_samples = WindowsDataset(rolling=True, step_size=5, max_samples=MAX_SAMPLES_tr, df=tr_df)
+    val_samples = WindowsDataset(rolling=True, step_size=5, max_samples=MAX_SAMPLES_val, df=val_df)
 
     #from src.features_compute import build_features_np
     X_tr, Y_tr = train_samples.X, train_samples.y
