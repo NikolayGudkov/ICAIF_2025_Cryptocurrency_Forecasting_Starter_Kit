@@ -11,11 +11,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-import signatory
+#import signatory
 from src.dataset import WindowsDataset
 from pathlib import Path
 import sys, warnings
 import pandas as pd
+from tqdm import tqdm
 
 # ==========================
 # Path augmentations for (log-)signature
@@ -37,6 +38,22 @@ def add_basepoint(path: torch.Tensor, base_value: float = 0.0) -> torch.Tensor:
     base = torch.full((B, 1, c), base_value, device=path.device, dtype=path.dtype)
     return torch.cat([base, path], dim=1)
 
+@dataclass
+class Config:
+    dim_in: int = None
+    steps: int = 10 # set after building dataset: d or 2*d (if mask channels enabled)
+    batch_size: int = 128
+    lr: float = 3e-4
+    weight_decay: float = 1e-2
+    epochs: int = 50
+    sig_depth: int = 3
+    use_logsig: bool = True
+    num_workers: int = 0
+    device: str = "cuda" if torch.cuda.is_available() else "cpu"
+    head_hidden_dim: int = 256
+    encoder_channels: Tuple[int, ...] =(64, 128, 128, 256, 256)
+    encoder_k: int = 3
+    encoder_pdrop: float = 0.1
 
 # ==========================
 # Dataset (prefix-only NaNs with mixed warm-up lengths)
@@ -218,7 +235,7 @@ class TCNBlock(nn.Module):
         return y
 
 class EncoderTCN(nn.Module):
-    def __init__(self, d_in: int, channels=(64, 128, 128, 256, 256), k: int = 3, pdrop: float = 0.1):
+    def __init__(self, d_in: int, channels: Tuple[int, ...], k: int, pdrop: float):
         super().__init__()
         blocks = []
         c_prev = d_in
@@ -236,22 +253,21 @@ class EncoderTCN(nn.Module):
         return z
 
 class FutureHead(nn.Module):
-    def __init__(self, in_dim: int, steps: int = 10):
+    def __init__(self, dim_in: int, hidden_dim: int, _steps: int):
         super().__init__()
-        self.mlp = nn.Sequential(nn.Linear(in_dim, 256), nn.ReLU(), nn.Linear(256, steps))
+        self.mlp = nn.Sequential(nn.Linear(dim_in, hidden_dim), nn.ReLU(), nn.Linear(hidden_dim, _steps))
 
-    def forward(self, z: torch.Tensor, p0: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        r_pred = self.mlp(z)                          # (B, steps)
-        levels = p0 + torch.cumsum(r_pred, dim=1)     # (B, steps)
-        return levels.unsqueeze(-1), r_pred           # (B,steps,1), (B,steps)
+    def forward(self, z: torch.Tensor) -> torch.Tensor:
+        log_r_pred = self.mlp(z)                          # (B, steps)
+        return torch.cumsum(log_r_pred, dim=1).unsqueeze(-1)  # (B, steps)         # (B,steps,1)
 
 class SigLossTCN(nn.Module):
-    def __init__(self, d_in: int, steps: int = 10, logsig_depth: int = 3, use_logsig: bool = True):
+    def __init__(self, cnf: Config):
         super().__init__()
-        self.encoder = EncoderTCN(d_in)
-        self.head = FutureHead(self.encoder.out_dim, steps=steps)
-        self.depth = logsig_depth
-        self.use_logsig = use_logsig
+        self.encoder = EncoderTCN(d_in = cnf.dim_in, channels=cnf.encoder_channels, k = cnf.encoder_k, pdrop=cnf.encoder_pdrop)
+        self.head = FutureHead(dim_in = self.encoder.out_dim, hidden_dim=cnf.head_hidden_dim, _steps=cnf.steps)
+        self.depth = cnf.sig_depth
+        self.use_logsig = cnf.use_logsig
 
     def signature(self, path_levels: torch.Tensor) -> torch.Tensor:
         path = time_augment(path_levels)
@@ -259,12 +275,13 @@ class SigLossTCN(nn.Module):
         path = add_basepoint(path)
         return signatory.logsignature(path, self.depth) if self.use_logsig else signatory.signature(path, self.depth)
 
-    def forward(self, x: torch.Tensor, y_true_levels: torch.Tensor, p0: torch.Tensor):
+    def forward(self, x: torch.Tensor, log_y_true_levels: torch.Tensor, log_last_price: torch.Tensor):
         z = self.encoder(x)
-        y_pred_levels, y_pred_returns = self.head(z, p0)
-        S_pred = self.signature(y_pred_levels)
-        S_true = self.signature(y_true_levels)
-        return {"y_pred_levels": y_pred_levels, "y_pred_returns": y_pred_returns, "S_pred": S_pred, "S_true": S_true}
+        pred_log_returns = self.head(z)
+        log_y_pred_levels = log_last_price.unsqueeze(-1) + torch.cumsum(self.head(z), dim=1)
+        S_pred = None #self.signature(log_y_pred_levels)
+        S_true = None #self.signature(log_y_true_levels)
+        return {"log_y_pred_levels": log_y_pred_levels, "log_y_true_levels": log_y_true_levels, "S_pred": S_pred, "S_true": S_true}
 
 
 # ==========================
@@ -276,23 +293,13 @@ class SigPathLoss(nn.Module):
         self.l2 = nn.MSELoss()
         self.lam_path = lam_path
 
-    def forward(self, outputs: dict, y_true_levels: torch.Tensor) -> torch.Tensor:
-        L_sig = self.l2(outputs["S_pred"], outputs["S_true"])
-        L_path = self.l2(outputs["y_pred_levels"], y_true_levels)
-        return L_sig + self.lam_path * L_path
-
-@dataclass
-class Config:
-    d_in: int = None         # set after building dataset: d or 2*d (if mask channels enabled)
-    steps: int = 10
-    batch_size: int = 128
-    lr: float = 3e-4
-    weight_decay: float = 1e-2
-    epochs: int = 50
-    logsig_depth: int = 3
-    use_logsig: bool = True
-    num_workers: int = 0
-    device: str = "cuda" if torch.cuda.is_available() else "cpu"
+    def forward(self, outputs: dict) -> torch.Tensor:
+        L_sig = None #self.l2(outputs["S_pred"], outputs["S_true"])
+        L_path = self.l2(outputs["log_y_pred_levels"], outputs["log_y_true_levels"])
+        if L_sig is not None:
+            return L_sig + self.lam_path * L_path
+        else:
+            return L_path
 
 def make_loaders(
     X_train: torch.Tensor,
@@ -329,33 +336,31 @@ def train(
     Y_train: torch.Tensor,
     X_val: torch.Tensor,
     Y_val: torch.Tensor,
-    price_feature_index: Optional[int] = 0,
-    #p0_train: Optional[torch.Tensor] = None,
-    #p0_val: Optional[torch.Tensor] = None,
-    cfg: Optional[Config] = None,
+    LLP_train: Optional[torch.Tensor] = None,
+    LLP_val: Optional[torch.Tensor] = None,
+    cnf: Optional[Config] = None,
 ):
     train_loader, val_loader, d_in = make_loaders(
         X_train, Y_train, X_val, Y_val,
-        price_feature_index=price_feature_index,
-        #p0_train=p0_train, p0_val=p0_val,
-        batch_size=cfg.batch_size if cfg else 128,
-        #num_workers=cfg.num_workers if cfg else 0,
+        p0_train=LLP_train, p0_val=LLP_val,
+        batch_size=cnf.batch_size,
+        num_workers=cnf.num_workers
     )
 
-    device = cfg.device
-    model = SigLossTCN(d_in=cfg.d_in, steps=cfg.steps, logsig_depth=cfg.logsig_depth, use_logsig=cfg.use_logsig).to(device)
+    device = cnf.device
+    model = SigLossTCN(cnf = cnf).to(device)
     criterion = SigPathLoss(lam_path=0.1)
-    opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
-    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.epochs)
+    opt = torch.optim.AdamW(model.parameters(), lr=cnf.lr, weight_decay=cnf.weight_decay)
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cnf.epochs)
 
     def run_epoch(loader, train_mode: bool):
         model.train(train_mode)
         total_loss, n = 0.0, 0
         with torch.set_grad_enabled(train_mode):
-            for Xb, Yb, P0b in loader:
-                Xb, Yb, P0b = Xb.to(device), Yb.to(device), P0b.to(device)
-                out = model(Xb, Yb, P0b)
-                loss = criterion(out, Yb)
+            for Xb, log_Yb, log_P0b in loader:
+                Xb, log_Yb, log_P0b = Xb.to(device), log_Yb.to(device), log_P0b.to(device)
+                out = model(Xb, log_Yb, log_P0b)
+                loss = criterion(out)
                 if train_mode:
                     opt.zero_grad(set_to_none=True)
                     loss.backward()
@@ -366,11 +371,12 @@ def train(
         return total_loss / max(n, 1)
 
     best_val, best_state = float("inf"), None
-    for epoch in range(1, cfg.epochs + 1):
+    for epoch in tqdm(range(1, cnf.epochs + 1)):
         tr_loss = run_epoch(train_loader, True)
         va_loss = run_epoch(val_loader, False)
         sched.step()
-        print(f"Epoch {epoch:3d} | train {tr_loss:.6f} | val {va_loss:.6f}")
+
+        print(f"\n Epoch {epoch:3d} | train {tr_loss:.6f} | val {va_loss:.6f}")
         if va_loss < best_val:
             best_val, best_state = va_loss, {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
@@ -383,9 +389,8 @@ def train(
 # Example synthetic usage
 # ==========================
 if __name__ == "__main__":
-    torch.manual_seed(0)
-    N_train, N_val, T_in, steps = 1024, 256, 60, 10
-    offset = T_in + steps
+    T_in, forward_steps = 60, 10
+    offset = T_in + forward_steps
 
     # Paths (adjust if your layout differs)
     ROOT = Path.cwd().parent if (Path.cwd().name == 'src') else Path.cwd()
@@ -425,7 +430,7 @@ if __name__ == "__main__":
     tr_df, val_df = [], []
     for g in train_groups.values():
         #g['event_timestamp'] = pd.date_range(start="2025-01-01", periods=g.shape[0], freq='T')
-        df_size = g.shape[0] - T_in - steps + 1
+        df_size = g.shape[0] - T_in - forward_steps + 1
         val_size = int(val_prc * df_size)
         train_size = df_size - val_size - offset
         tr_df.append(g.iloc[:train_size])
@@ -438,21 +443,22 @@ if __name__ == "__main__":
     train_samples = WindowsDataset(rolling=True, step_size=5, max_samples=MAX_SAMPLES_tr, df=tr_df)
     val_samples = WindowsDataset(rolling=True, step_size=5, max_samples=MAX_SAMPLES_val, df=val_df)
 
-    from src.features_compute import build_features_np
+    #from src.features_compute import build_features_np
     X_tr, Y_tr = train_samples.X, train_samples.y
     X_tr, Y_tr = torch.from_numpy(X_tr), torch.from_numpy(Y_tr)
 
     X_va, Y_va = val_samples.X, val_samples.y
     X_va, Y_va = torch.from_numpy(X_va), torch.from_numpy(Y_va)
 
-    cfg = Config(steps=steps, epochs=10, d_in=2*X_tr.shape[2])  # quick demo
-    model = train(X_tr, Y_tr, X_va, Y_va, price_feature_index=0, cfg=cfg)
+    Y_tr, Y_va = torch.log(Y_tr), torch.log(Y_va)
+    LLP_tr, LLP_va = torch.log(torch.from_numpy(train_samples.X[:,-1, 0])).unsqueeze(dim=1), torch.log(torch.from_numpy(val_samples.X[:,-1, 0])).unsqueeze(dim=1)
+
+
+    cnf = Config(dim_in=2*X_tr.shape[2])  # quick demo
+    model = train(X_train = X_tr, Y_train=Y_tr, X_val = X_va, Y_val = Y_va, LLP_train=LLP_tr, LLP_val=LLP_va, cnf=cnf)
     torch.save(model.state_dict(), weights_path)
 
-    model = SigLossTCN(d_in=cfg.d_in,
-                       steps=cfg.steps,
-                       logsig_depth=cfg.logsig_depth,
-                       use_logsig=cfg.use_logsig).to(DEVICE)
+    model = SigLossTCN(cnf).to(DEVICE)
     state_dict = torch.load(weights_path, map_location="cpu")
 
     # model.load_state_dict(state_dict)
