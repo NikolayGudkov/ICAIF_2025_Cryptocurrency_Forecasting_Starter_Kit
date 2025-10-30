@@ -416,15 +416,15 @@ if __name__ == "__main__":
     DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     try:
-        raw_data = pd.read_parquet('./data/train.parquet')
+        raw_data = pd.read_parquet('../data/train.parquet')
     except pyarrow.lib.ArrowInvalid:
         raw_data = pd.read_pickle('./data/train.pkl')
 
     train_data = raw_data[raw_data['series_id']<40]
     test_data = raw_data[raw_data['series_id']>=40]
 
-    MAX_SAMPLES_tr = 500000
-    MAX_SAMPLES_val = 200000
+    MAX_SAMPLES_tr = 10000000
+    MAX_SAMPLES_val = 2000000
 
     val_prc = 0.2
 
@@ -444,8 +444,8 @@ if __name__ == "__main__":
     val_df = pd.concat(val_df, axis=0)
 
 
-    train_samples = WindowsDataset(rolling=True, step_size=20, max_samples=MAX_SAMPLES_tr, df=tr_df)
-    val_samples = WindowsDataset(rolling=True, step_size=20, max_samples=MAX_SAMPLES_val, df=val_df)
+    train_samples = WindowsDataset(rolling=True, step_size=10, max_samples=MAX_SAMPLES_tr, df=tr_df)
+    val_samples = WindowsDataset(rolling=True, step_size=10, max_samples=MAX_SAMPLES_val, df=val_df)
 
     #from src.features_compute import build_features_np
     X_tr, Y_tr = train_samples.X, train_samples.y
