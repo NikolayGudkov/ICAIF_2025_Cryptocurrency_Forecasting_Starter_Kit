@@ -51,7 +51,7 @@ class Config:
     num_workers: int = 0
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     head_hidden_dim: int = 256
-    encoder_channels: Tuple[int, ...] =(64, 128, 128, 256, 256)
+    encoder_channels: Tuple[int, ...] =(64, 128, 128, 256)
     encoder_k: int = 3
     encoder_pdrop: float = 0.1
 
@@ -419,8 +419,8 @@ if __name__ == "__main__":
     train_data = raw_data[raw_data['series_id']<40]
     test_data = raw_data[raw_data['series_id']>=40]
 
-    MAX_SAMPLES_tr = 200
-    MAX_SAMPLES_val = 100
+    MAX_SAMPLES_tr = 2000000
+    MAX_SAMPLES_val = 100000
 
     val_prc = 0.2
 
@@ -440,8 +440,8 @@ if __name__ == "__main__":
     val_df = pd.concat(val_df, axis=0)
 
 
-    train_samples = WindowsDataset(rolling=True, step_size=5, max_samples=MAX_SAMPLES_tr, df=tr_df)
-    val_samples = WindowsDataset(rolling=True, step_size=5, max_samples=MAX_SAMPLES_val, df=val_df)
+    train_samples = WindowsDataset(rolling=True, step_size=1, max_samples=MAX_SAMPLES_tr, df=tr_df)
+    val_samples = WindowsDataset(rolling=True, step_size=1, max_samples=MAX_SAMPLES_val, df=val_df)
 
     #from src.features_compute import build_features_np
     X_tr, Y_tr = train_samples.X, train_samples.y
