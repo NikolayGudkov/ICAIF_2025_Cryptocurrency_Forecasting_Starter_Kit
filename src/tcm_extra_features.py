@@ -273,7 +273,7 @@ class SigLossTCN(nn.Module):
         path = time_augment(path_levels)
         path = lead_lag(path)
         path = add_basepoint(path)
-        return signatory.logsignature(path, self.depth) if self.use_logsig else signatory.signature(path, self.depth)
+       # return signatory.logsignature(path, self.depth) if self.use_logsig else signatory.signature(path, self.depth)
 
     def forward(self, x: torch.Tensor, log_y_true_levels: torch.Tensor, log_last_price: torch.Tensor):
         z = self.encoder(x)
