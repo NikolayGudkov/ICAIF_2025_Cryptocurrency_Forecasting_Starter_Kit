@@ -416,7 +416,7 @@ if __name__ == "__main__":
     DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     try:
-        raw_data = pd.read_parquet('../data/train.parquet')
+        raw_data = pd.read_parquet('./data/train.parquet')
     except pyarrow.lib.ArrowInvalid:
         raw_data = pd.read_pickle('./data/train.pkl')
 
