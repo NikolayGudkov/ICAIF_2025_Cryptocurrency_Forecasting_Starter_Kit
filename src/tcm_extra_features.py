@@ -416,15 +416,15 @@ if __name__ == "__main__":
     DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     try:
-        raw_data = pd.read_parquet('./data/train.parquet')
+        raw_data = pd.read_parquet('../data/train.parquet')
     except pyarrow.lib.ArrowInvalid:
-        raw_data = pd.read_pickle('./data/train.pkl')
+        raw_data = pd.read_pickle('../data/train.pkl')
 
     train_data = raw_data[raw_data['series_id']<40]
     test_data = raw_data[raw_data['series_id']>=40]
 
     MAX_SAMPLES_tr = 10000000
-    MAX_SAMPLES_val = 2000
+    MAX_SAMPLES_val = 2000000
 
     val_prc = 0.2
 
@@ -445,7 +445,7 @@ if __name__ == "__main__":
 
 
     train_samples = WindowsDataset(rolling=True, step_size=10, max_samples=MAX_SAMPLES_tr, df=tr_df)
-    val_samples = WindowsDataset(rolling=True, step_size=200, max_samples=MAX_SAMPLES_val, df=val_df)
+    val_samples = WindowsDataset(rolling=True, step_size=10, max_samples=MAX_SAMPLES_val, df=val_df)
 
     #from src.features_compute import build_features_np
     X_tr, Y_tr = train_samples.X, train_samples.y
@@ -474,23 +474,27 @@ if __name__ == "__main__":
             batch_size=X_va.shape[0],
             num_workers=cnf.num_workers
         )
-        xb, yb, p0b = next(iter(val_loader))
-        out = model(xb, yb, p0b)
+
+        out = []
+        for xb, yb, p0b in val_loader:
+            out = model(xb, yb, p0b)
+
 
     steps_X = np.arange(T_in)
-    x_test = pd.concat([pd.DataFrame(data={'window_id': np.full(xb.shape[1], i),
+    window_ids = np.arange(X_va.shape[0])
+    x_test = pd.concat([pd.DataFrame(data={'window_id': window_ids[i],
                                            'time_step': steps_X,
                                            'close': X_va[i][:, 0],
                                            'volume': X_va[i][:, 1]}) for i in range(X_va.shape[0])], axis=0)
 
 
-    window_ids = np.random.randint(100, size=X_va.shape[0])
+    window_shifts = np.random.randint(100, size=X_va.shape[0])
     steps_y = np.arange(forward_steps)
     event_datetime = pd.date_range(start="2025-01-01", periods=10, freq='T')
     y_local = pd.concat([pd.DataFrame(data={'window_id': window_ids[i],
                                             'time_step': steps_y,
                                             'close': np.exp(yb[i][:, 0]),
-                                            'event_datetime': event_datetime + pd.Timedelta(minutes=11 * window_ids[i]),
+                                            'event_datetime': event_datetime + pd.Timedelta(minutes=11 * window_shifts[i]),
                                             'token': 'NAN'}) for i in range(yb.shape[0])], axis=0)
 
     FIRST_N_WINDOWS = X_va.shape[0]
@@ -511,10 +515,10 @@ if __name__ == "__main__":
     # x_test_view = x_test[x_test['window_id'].isin(sel_wids)] if FIRST_N_WINDOWS is not None else x_test
 
     # predict -> submission-like DataFrame # columns: window_id, time_step, pred_close
-    submission_df = pd.concat([pd.DataFrame(data={'window_id': np.full(yb.shape[1], i),
+    submission_df = pd.concat([pd.DataFrame(data={'window_id': window_ids[i],
                                                   'time_step': steps_y,
                                                   'pred_close': np.exp(out['log_y_pred_levels'][i][:, 0]),
-                                                  'event_datetime': event_datetime + pd.Timedelta(minutes=11 * window_ids[i]),
+                                                  'event_datetime': event_datetime + pd.Timedelta(minutes=11 * window_shifts[i]),
                                                   'token': 'NAN'}) for i in range(yb.shape[0])], axis=0)
 
 
@@ -536,7 +540,7 @@ if __name__ == "__main__":
 
     from src.metrics import evaluate_all_metrics
 
-    target_wids = np.arange(1, FIRST_N_WINDOWS + 1)  # [1, 2]
+    target_wids = np.arange(0, FIRST_N_WINDOWS + 1)  # [1, 2]
     # y_local = pd.read_pickle(y_local_path)     # ground truth: ['window_id','time_step','close']
     pred_local = submission_df[submission_df["window_id"].isin(target_wids)].copy()
 
@@ -582,8 +586,8 @@ if __name__ == "__main__":
     print("\nLocal Eval on window_id 1 & 2")
     print(pd.DataFrame([off_stats]).T.rename(columns={0: "value"}))
 
-    print("Predicted path shape:", out["y_pred_levels"].shape)
-    print("LogSig dim:", out["S_pred"].shape[-1])
+    print("Predicted path shape:", out["log_y_pred_levels"].shape)
+    # print("LogSig dim:", out["S_pred"].shape[-1])
 
     # # Inference sanity check
     # model.eval()
