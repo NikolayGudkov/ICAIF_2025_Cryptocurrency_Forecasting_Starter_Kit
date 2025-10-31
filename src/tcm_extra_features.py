@@ -377,7 +377,8 @@ def train(
         va_loss = run_epoch(val_loader, False)
         sched.step()
 
-        print(f"\n Epoch {epoch:3d} | train {tr_loss:.6f} | val {va_loss:.6f}")
+        print('\n')
+        print(f"Epoch {epoch:3d} | train {tr_loss:.6f} | val {va_loss:.6f}")
         if va_loss < best_val:
             best_val, best_state = va_loss, {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
