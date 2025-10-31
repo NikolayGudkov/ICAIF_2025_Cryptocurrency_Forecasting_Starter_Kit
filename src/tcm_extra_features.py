@@ -424,7 +424,7 @@ if __name__ == "__main__":
     test_data = raw_data[raw_data['series_id']>=40]
 
     MAX_SAMPLES_tr = 10000000
-    MAX_SAMPLES_val = 2000000
+    MAX_SAMPLES_val = 20000
 
     val_prc = 0.2
 
