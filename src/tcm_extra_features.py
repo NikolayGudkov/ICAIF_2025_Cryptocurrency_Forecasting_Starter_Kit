@@ -514,7 +514,7 @@ if __name__ == "__main__":
     submission_df = pd.concat([pd.DataFrame(data={'window_id': np.full(yb.shape[1], i),
                                                   'time_step': steps_y,
                                                   'pred_close': np.exp(out['log_y_pred_levels'][i][:, 0]),
-                                                  'event_datetime': event_datetime + pd.Timedelta(minutes=11 * i),
+                                                  'event_datetime': event_datetime + pd.Timedelta(minutes=11 * window_ids[i]),
                                                   'token': 'NAN'}) for i in range(yb.shape[0])], axis=0)
 
 
