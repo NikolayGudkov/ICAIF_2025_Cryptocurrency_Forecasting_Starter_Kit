@@ -34,7 +34,7 @@ class Config:
     batch_size: int = 128
     lr: float = 3e-4
     weight_decay: float = 1e-2
-    epochs: int = 10
+    epochs: int = 50
     sig_depth: int = 3
     use_logsig: bool = True
     num_workers: int = 0
