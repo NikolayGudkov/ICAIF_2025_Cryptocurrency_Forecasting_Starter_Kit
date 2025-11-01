@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
     model = SigLossTCN(cnf).to(DEVICE)
 
-    model.load_state_dict(state_dict)
+    model.load_state_dict(state_dict['best_state'])
     model.eval()
     with torch.no_grad():
         for xb, yb, p0b in val_loader:

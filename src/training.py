@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 import pandas as pd
 from tqdm import tqdm
-from sig_tcm import Config, SigLossTCN, SigPathLoss
+from src.sig_tcm import Config, SigLossTCN, SigPathLoss
 from src.data_preparation import make_loaders, data_split
 
 
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     SUBM = ROOT / "sample_submission"
 
     train_path = DATA / "train.parquet"
-    weights_path = SUBM / "lstm_weights_test.pkl"
+    weights_path = SUBM / "lstm_weights_sigs1.pkl"
 
     # Ensure src is importable
     if str(SRC) not in sys.path:
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     val_df = pd.concat(val_df, axis=0)
 
     X_tr, log_Y_tr, LLP_tr = data_split(step_size=10, max_samples=10000000, df=tr_df)
-    X_va, log_Y_va, LLP_va = data_split(step_size=10, max_samples=20000, df=val_df)
+    X_va, log_Y_va, LLP_va = data_split(step_size=10, max_samples=20000000, df=val_df)
 
     _, best_state, ds_train_mean, ds_train_std = train(X_train = X_tr, Y_train=log_Y_tr, X_val = X_va, Y_val = log_Y_va, LLP_train=LLP_tr, LLP_val=LLP_va, cnf=cnf)
 

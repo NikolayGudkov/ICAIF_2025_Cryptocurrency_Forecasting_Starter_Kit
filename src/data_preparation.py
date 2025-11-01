@@ -168,4 +168,4 @@ def data_split(df: pd.DataFrame, step_size: int, max_samples: int, feature_gener
 
     log_y, LLP= torch.log(y), torch.log(X[:,-1, 0]).unsqueeze(dim=1)
 
-    return X, y, log_y
+    return X, log_y, LLP
