@@ -4,7 +4,6 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 from utils.dataset import WindowsDataset
 
-
 class Seq2FuturePriceDataset(Dataset):
     """
     - Handles features with leading NaNs only (warm-up), no internal gaps.
@@ -19,8 +18,7 @@ class Seq2FuturePriceDataset(Dataset):
     def __init__(
         self,
         X: torch.Tensor,                  # (N, 60, d)
-        Y_future_levels: torch.Tensor,    # (N, 10) future price levels
-        #price_feature_index: Optional[int] = None,
+        Y_future_levels: Optional[torch.Tensor] = None,    # (N, 10) future price levels
         p0_tensor: Optional[torch.Tensor] = None,    # (N,1) last observed price if not inside X
         standardize_X: bool = True,
         mean: Optional[torch.Tensor] = None,
@@ -33,9 +31,14 @@ class Seq2FuturePriceDataset(Dataset):
         long_warmup_threshold: int = 20          # length threshold for ramp
     ):
         assert X.ndim == 3 and X.shape[1] == 60, "X must be (N, 60, d)"
-        assert Y_future_levels.ndim == 2 and Y_future_levels.shape[1] == 10, "Y must be (N, 10)"
         self.X_raw = X.float().clone()
-        self.Y = Y_future_levels.float().clone().unsqueeze(-1)  # (N, 10, 1)
+
+        if Y_future_levels is not None:
+            assert Y_future_levels.ndim == 2 and Y_future_levels.shape[1] == 10, "Y must be (N, 10)"
+            self.Y = Y_future_levels.float().clone().unsqueeze(-1)  # (N, 10, 1)
+        else:
+            self.Y = None
+
         self.N, _, self.d = self.X_raw.shape
 
         self.add_missing_indicators = add_missing_indicators
@@ -132,8 +135,10 @@ class Seq2FuturePriceDataset(Dataset):
         return self.N
 
     def __getitem__(self, idx):
-        return self.X[idx], self.Y[idx], self.p0[idx]
-
+        if self.Y is not None:
+            return self.X[idx], self.Y[idx], self.p0[idx]
+        else:
+            return self.X[idx], self.p0[idx]
 
 def make_loaders(
     X_train: torch.Tensor,

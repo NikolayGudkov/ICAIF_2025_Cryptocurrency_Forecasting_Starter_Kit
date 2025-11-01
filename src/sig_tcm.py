@@ -30,6 +30,7 @@ def add_basepoint(path: torch.Tensor, base_value: float = 0.0) -> torch.Tensor:
 class Config:
     dim_in: int = 4
     steps: int = 10 # set after building dataset: d or 2*d (if mask channels enabled)
+    T_in: int = 60
     batch_size: int = 128
     lr: float = 3e-4
     weight_decay: float = 1e-2
@@ -39,7 +40,7 @@ class Config:
     num_workers: int = 0
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     head_hidden_dim: int = 256
-    encoder_channels: Tuple[int, ...] =(64, 128, 128, 256)
+    encoder_channels: Tuple[int, ...] = (64, 128, 128, 256)
     encoder_k: int = 3
     encoder_pdrop: float = 0.1
 
@@ -138,9 +139,7 @@ class SigLossTCN(nn.Module):
         path = add_basepoint(path)
         return signatory.logsignature(path, self.depth) if self.use_logsig else signatory.signature(path, self.depth)
 
-    def forward(self, x: torch.Tensor, log_y_true_levels: torch.Tensor, log_last_price: torch.Tensor):
+    def forward(self, x: torch.Tensor, log_last_price: torch.Tensor):
         z = self.encoder(x)
         log_y_pred_levels = log_last_price.unsqueeze(-1) + torch.cumsum(self.head(z), dim=1)
-        S_pred = self.signature(log_y_pred_levels)
-        S_true = self.signature(log_y_true_levels)
-        return {"log_y_pred_levels": log_y_pred_levels, "log_y_true_levels": log_y_true_levels, "S_pred": S_pred, "S_true": S_true}
+        return log_y_pred_levels

@@ -1,15 +1,12 @@
 from typing import Optional
 import numpy as np
 import torch
-from utils.dataset import WindowsDataset
 from pathlib import Path
 import sys
 import pandas as pd
 from tqdm import tqdm
-import pyarrow
 from sig_tcm import Config, SigLossTCN, SigPathLoss
 from src.data_preparation import make_loaders, data_split
-import pickle
 
 
 def train(
@@ -40,8 +37,11 @@ def train(
         with torch.set_grad_enabled(train_mode):
             for Xb, log_Yb, log_P0b in loader:
                 Xb, log_Yb, log_P0b = Xb.to(device), log_Yb.to(device), log_P0b.to(device)
-                out = model(Xb, log_Yb, log_P0b)
-                loss = criterion(out)
+
+                log_Yb_pred = model(Xb, log_P0b)
+                S_pred = model.signature(log_Yb_pred)
+                S_true = model.signature(log_Yb)
+                loss = criterion({"log_y_pred_levels": log_Yb_pred, "log_y_true_levels": log_Yb, "S_pred": S_pred, "S_true": S_true})
                 if train_mode:
                     opt.zero_grad(set_to_none=True)
                     loss.backward()
@@ -71,7 +71,9 @@ def train(
 # Example synthetic usage
 # ==========================
 if __name__ == "__main__":
-    T_in, forward_steps = 60, 10
+    cnf = Config()
+
+    T_in, forward_steps = cnf.T_in, cnf.steps
     offset = T_in + forward_steps
 
     # Paths (adjust if your layout differs)
@@ -96,10 +98,7 @@ if __name__ == "__main__":
 
     DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    try:
-        raw_data = pd.read_parquet('../data/train.parquet')
-    except pyarrow.lib.ArrowInvalid:
-        raw_data = pd.read_pickle('../data/train.pkl')
+    raw_data = pd.read_parquet(train_path)
 
     train_data = raw_data[raw_data['series_id']<40]
     test_data = raw_data[raw_data['series_id']>=40]
@@ -121,8 +120,6 @@ if __name__ == "__main__":
     X_tr, log_Y_tr, LLP_tr = data_split(step_size=10, max_samples=10000000, df=tr_df)
     X_va, log_Y_va, LLP_va = data_split(step_size=10, max_samples=20000, df=val_df)
 
-    cnf = Config()
-
     _, best_state, ds_train_mean, ds_train_std = train(X_train = X_tr, Y_train=log_Y_tr, X_val = X_va, Y_val = log_Y_va, LLP_train=LLP_tr, LLP_val=LLP_va, cnf=cnf)
 
     # Save the weights
@@ -130,5 +127,4 @@ if __name__ == "__main__":
                    'ds_train_mean': ds_train_mean,
                    'ds_train_std': ds_train_std}
 
-    with open(weights_path, "wb") as f:
-        pickle.dump(obj_to_save, f)
+    torch.save(obj_to_save, weights_path)
