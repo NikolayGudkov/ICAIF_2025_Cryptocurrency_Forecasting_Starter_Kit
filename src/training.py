@@ -80,7 +80,7 @@ if __name__ == "__main__":
     SRC = ROOT / "src"
     SUBM = ROOT / "sample_submission"
 
-    train_path = DATA / "train.parquet"
+    train_path = DATA / "train.pkl"
     weights_path = SUBM / "model_weights_0.pkl"
 
     # Ensure src is importable
@@ -96,7 +96,7 @@ if __name__ == "__main__":
 
     DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    raw_data = pd.read_parquet(train_path)
+    raw_data = pd.read_pickle(train_path)
 
     train_data = raw_data #[raw_data['series_id']<40]
     #test_data = raw_data[raw_data['series_id']>=40]
