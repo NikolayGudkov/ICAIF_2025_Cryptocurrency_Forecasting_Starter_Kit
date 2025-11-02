@@ -1,8 +1,11 @@
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Tuple, Union
 import torch
 import torch.nn as nn
 import signatory
+from pathlib import Path
+import pandas as pd
+import pickle
 
 
 # ==========================
@@ -29,12 +32,12 @@ def add_basepoint(path: torch.Tensor, base_value: float = 0.0) -> torch.Tensor:
 @dataclass
 class Config:
     dim_in: int = 2
-    steps: int = 10 # set after building dataset: d or 2*d (if mask channels enabled)
+    steps: int = 10
     T_in: int = 60
     batch_size: int = 128
     lr: float = 3e-4
     weight_decay: float = 1e-2
-    epochs: int = 50
+    epochs: int = 10
     sig_depth: int = 3
     use_logsig: bool = True
     num_workers: int = 0
@@ -132,6 +135,9 @@ class SigLossTCN(nn.Module):
         self.head = FutureHead(dim_in = self.encoder.out_dim, hidden_dim=cnf.head_hidden_dim, _steps=cnf.steps)
         self.depth = cnf.sig_depth
         self.use_logsig = cnf.use_logsig
+        self.mu = None
+        self.sig = None
+
 
     def signature(self, path_levels: torch.Tensor) -> torch.Tensor:
         path = time_augment(path_levels)
@@ -139,7 +145,47 @@ class SigLossTCN(nn.Module):
         path = add_basepoint(path)
         return signatory.logsignature(path, self.depth) if self.use_logsig else signatory.signature(path, self.depth)
 
+
     def forward(self, x: torch.Tensor, log_last_price: torch.Tensor):
         z = self.encoder(x)
         log_y_pred_levels = log_last_price.unsqueeze(-1) + torch.cumsum(self.head(z), dim=1)
         return log_y_pred_levels
+
+
+    @staticmethod
+    def _check_train_schema(df: pd.DataFrame) -> None:
+        cols = {"series_id", "time_step", "close", "volume"}
+        missing = cols - set(df.columns)
+        if missing:
+            raise ValueError(f"x_train missing columns: {sorted(missing)}")
+        # dtypes are not strictly enforced here; only presence & basic sanity
+        if df.empty:
+            raise ValueError("x_train is empty.")
+
+    @staticmethod
+    def _check_test_schema(df: pd.DataFrame) -> None:
+        cols = {"window_id", "time_step", "close", "volume"}
+        missing = cols - set(df.columns)
+        if missing:
+            raise ValueError(f"x_test missing columns: {sorted(missing)}")
+        if df.empty:
+            raise ValueError("x_test is empty.")
+
+
+# -------- Required by platform --------
+def init_model(weights_path: Union[Path, str] = "model_weights.pkl") -> SigLossTCN:
+    """Factory function required for submission."""
+    cfg = None
+    if weights_path and Path(weights_path).exists():
+        # with open(weights_path, "rb") as f:
+        #     obj = pickle.load(f)
+        #     cfg = obj.get("config", None)
+        cfg = Config()
+        model = SigLossTCN(cfg).to('cpu')
+        state_dict = torch.load(weights_path, map_location="cpu")
+        model.load_state_dict(state_dict['best_state'])
+        model.mu, model.sig = state_dict['ds_train_mean'], state_dict['ds_train_std']
+        model.eval()
+        return model
+    else:
+        raise FileNotFoundError('Weights are not found.')

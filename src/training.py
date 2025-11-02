@@ -27,6 +27,7 @@ def train(
 
     device = cnf.device
     model = SigLossTCN(cnf = cnf).to(device)
+    model.mu, model.sig = ds_train_mean, ds_train_std
     criterion = SigPathLoss(lam_path=0.1)
     opt = torch.optim.AdamW(model.parameters(), lr=cnf.lr, weight_decay=cnf.weight_decay)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cnf.epochs)
@@ -67,9 +68,6 @@ def train(
     return model, best_state, ds_train_mean, ds_train_std
 
 
-# ==========================
-# Example synthetic usage
-# ==========================
 if __name__ == "__main__":
     cnf = Config()
 
@@ -83,7 +81,7 @@ if __name__ == "__main__":
     SUBM = ROOT / "sample_submission"
 
     train_path = DATA / "train.parquet"
-    weights_path = SUBM / "lstm_weights_sigs1.pkl"
+    weights_path = SUBM / "lstm_weights_sig1.pkl"
 
     # Ensure src is importable
     if str(SRC) not in sys.path:
@@ -92,7 +90,7 @@ if __name__ == "__main__":
     # Create sample_submission dir if missing
     SUBM.mkdir(parents=True, exist_ok=True)
 
-    SEED = 1337
+    SEED = 1338
     np.random.seed(SEED)
     torch.manual_seed(SEED)
 
@@ -100,13 +98,13 @@ if __name__ == "__main__":
 
     raw_data = pd.read_parquet(train_path)
 
-    train_data = raw_data[raw_data['series_id']<40]
-    test_data = raw_data[raw_data['series_id']>=40]
+    train_data = raw_data #[raw_data['series_id']<40]
+    #test_data = raw_data[raw_data['series_id']>=40]
 
     train_groups = {sid: g.sort_values('time_step').reset_index(drop=True)
                        for sid, g in train_data.groupby('series_id')}
 
-    tr_df, val_df, val_prc = [], [], 0.2
+    tr_df, val_df, val_prc = [], [], 0.95
     for g in train_groups.values():
         df_size = g.shape[0] - offset + 1
         val_size = int(val_prc * df_size)
@@ -118,7 +116,7 @@ if __name__ == "__main__":
     val_df = pd.concat(val_df, axis=0)
 
     X_tr, log_Y_tr, LLP_tr = data_split(step_size=10, max_samples=10000000, df=tr_df)
-    X_va, log_Y_va, LLP_va = data_split(step_size=10, max_samples=20000000, df=val_df)
+    X_va, log_Y_va, LLP_va = data_split(step_size=10, max_samples=200000, df=val_df)
 
     _, best_state, ds_train_mean, ds_train_std = train(X_train = X_tr, Y_train=log_Y_tr, X_val = X_va, Y_val = log_Y_va, LLP_train=LLP_tr, LLP_val=LLP_va, cnf=cnf)
 

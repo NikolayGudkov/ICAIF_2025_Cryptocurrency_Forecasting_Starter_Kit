@@ -180,7 +180,7 @@ def init_model(weights_path: str = "model_weights.pkl") -> SigLossTCN:
 
         model = SigLossTCN(cfg).to('cpu')
         state_dict = torch.load(weights_path, map_location="cpu")
-        model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict['best_state'])
         model.eval()
         return model
     else:
