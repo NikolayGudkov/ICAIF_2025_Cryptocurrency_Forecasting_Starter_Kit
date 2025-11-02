@@ -81,7 +81,7 @@ if __name__ == "__main__":
     SUBM = ROOT / "sample_submission"
 
     train_path = DATA / "train.parquet"
-    weights_path = SUBM / "lstm_weights_sig1.pkl"
+    weights_path = SUBM / "model_weights_0.pkl"
 
     # Ensure src is importable
     if str(SRC) not in sys.path:
@@ -104,7 +104,7 @@ if __name__ == "__main__":
     train_groups = {sid: g.sort_values('time_step').reset_index(drop=True)
                        for sid, g in train_data.groupby('series_id')}
 
-    tr_df, val_df, val_prc = [], [], 0.95
+    tr_df, val_df, val_prc = [], [], 0.05
     for g in train_groups.values():
         df_size = g.shape[0] - offset + 1
         val_size = int(val_prc * df_size)
