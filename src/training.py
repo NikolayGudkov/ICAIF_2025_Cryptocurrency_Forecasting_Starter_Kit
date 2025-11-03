@@ -81,7 +81,7 @@ if __name__ == "__main__":
     SUBM = ROOT / "sample_submission"
 
     train_path = DATA / "train.parquet"
-    weights_path = SUBM / "model_weights_0.pkl"
+    weights_path = SUBM / "model_weights_1.pkl"
 
     # Ensure src is importable
     if str(SRC) not in sys.path:
