@@ -3,6 +3,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 from utils.dataset import WindowsDataset
+import numpy as np
 
 class Seq2FuturePriceDataset(Dataset):
     """
@@ -130,6 +131,7 @@ class Seq2FuturePriceDataset(Dataset):
             self.p0 = p0_tensor.float().clone()
         else:
             raise ValueError("Provide p0_tensor explicitly.")
+        self.X = self.X[:,:,:20]
 
     def __len__(self):
         return self.N
@@ -162,11 +164,11 @@ def make_loaders(
 def data_split(df: pd.DataFrame, step_size: int, max_samples: int, feature_generator: Callable = None):
     samples = WindowsDataset(rolling=True, step_size=step_size, max_samples=max_samples, df=df)
     X, y = samples.X, samples.y
-
+    LLP = torch.log(torch.from_numpy(X[:, -1, 0])).unsqueeze(dim=1)
     if feature_generator is not None:
         X = feature_generator(X)
 
     X, y = torch.from_numpy(X), torch.from_numpy(y)
-    log_y, LLP= torch.log(y), torch.log(X[:,-1, 0]).unsqueeze(dim=1)
+    log_y = torch.log(y)
 
     return X, log_y, LLP
