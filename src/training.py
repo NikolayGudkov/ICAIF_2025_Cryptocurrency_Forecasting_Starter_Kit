@@ -115,8 +115,8 @@ if __name__ == "__main__":
     tr_df = pd.concat(tr_df, axis=0)
     val_df = pd.concat(val_df, axis=0)
 
-    X_tr, log_Y_tr, LLP_tr = data_split(step_size=10, max_samples=10000, df=tr_df)
-    X_va, log_Y_va, LLP_va = data_split(step_size=10, max_samples=2000, df=val_df)
+    X_tr, log_Y_tr, LLP_tr = data_split(step_size=10, max_samples=100000000, df=tr_df)
+    X_va, log_Y_va, LLP_va = data_split(step_size=10, max_samples=200000000, df=val_df)
 
     _, best_state, ds_train_mean, ds_train_std = train(X_train = X_tr, Y_train=log_Y_tr, X_val = X_va, Y_val = log_Y_va, LLP_train=LLP_tr, LLP_val=LLP_va, cnf=cnf)
 
