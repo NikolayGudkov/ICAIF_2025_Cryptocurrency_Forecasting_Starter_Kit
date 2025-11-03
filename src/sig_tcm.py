@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Tuple, Union
 import torch
 import torch.nn as nn
-import signatory
 from pathlib import Path
 import pandas as pd
 import pickle
@@ -46,6 +45,7 @@ class Config:
     encoder_channels: Tuple[int, ...] = (64, 128, 128, 256)
     encoder_k: int = 3
     encoder_pdrop: float = 0.1
+    sig_loss: bool = False
 
 
 # ==========================
@@ -120,9 +120,10 @@ class SigPathLoss(nn.Module):
         self.lam_path = lam_path
 
     def forward(self, outputs: dict) -> torch.Tensor:
-        L_sig = self.l2(outputs["S_pred"], outputs["S_true"])
         L_path = self.l2(outputs["log_y_pred_levels"], outputs["log_y_true_levels"])
-        if L_sig is not None:
+
+        if outputs["S_pred"] is not None:
+            L_sig = self.l2(outputs["S_pred"], outputs["S_true"])
             return L_sig + self.lam_path * L_path
         else:
             return L_path
@@ -137,14 +138,19 @@ class SigLossTCN(nn.Module):
         self.use_logsig = cnf.use_logsig
         self.mu = None
         self.sig = None
+        self.cnf = cnf
 
 
     def signature(self, path_levels: torch.Tensor) -> torch.Tensor:
         path = time_augment(path_levels)
         path = lead_lag(path)
         path = add_basepoint(path)
-        return signatory.logsignature(path, self.depth) if self.use_logsig else signatory.signature(path, self.depth)
 
+        if self.cnf.sig_loss:
+            import signatory
+            return signatory.logsignature(path, self.depth) if self.use_logsig else signatory.signature(path, self.depth)
+        else:
+            return None
 
     def forward(self, x: torch.Tensor, log_last_price: torch.Tensor):
         z = self.encoder(x)
@@ -175,11 +181,7 @@ class SigLossTCN(nn.Module):
 # -------- Required by platform --------
 def init_model(weights_path: Union[Path, str] = "model_weights.pkl") -> SigLossTCN:
     """Factory function required for submission."""
-    cfg = None
     if weights_path and Path(weights_path).exists():
-        # with open(weights_path, "rb") as f:
-        #     obj = pickle.load(f)
-        #     cfg = obj.get("config", None)
         cfg = Config()
         model = SigLossTCN(cfg).to('cpu')
         state_dict = torch.load(weights_path, map_location="cpu")
