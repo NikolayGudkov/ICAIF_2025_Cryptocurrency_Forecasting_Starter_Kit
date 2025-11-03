@@ -104,9 +104,9 @@ def build_features_np(X, fillna=False, eps=1e-12):
         s = np.sqrt(np.maximum(v, 0.0))
         return np.concatenate([np.full((N, w-1), np.nan), s], axis=1)
     vol10 = _roll_std_returns(r1, 10)
-    vol20 = _roll_std_returns(r1, 20)
+    #vol20 = _roll_std_returns(r1, 20)
     #vol60 = _roll_std_returns(r1, 60)
-    vol_ratio = vol10 / (vol20 + eps)
+    #vol_ratio = vol10 / (vol20 + eps)
 
     # Range position over 20 (on price)
     min20 = _rolling_min(price, 20)
@@ -135,11 +135,11 @@ def build_features_np(X, fillna=False, eps=1e-12):
     feats = [#price, volume,
         log_p, log_v, r1,
         mom3, mom10,
-        ema3_10, ema10_30,
+        ema3_10, # ema10_30,
         #z_lp20,
         slope30,
-        vol10, vol20, # vol60,
-             vol_ratio,
+        vol10,# vol20, # vol60,
+             #vol_ratio,
         range_pos20,
         rel_vol20, vol_mom5,
         #z_lv20,
