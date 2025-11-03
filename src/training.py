@@ -43,8 +43,8 @@ def train(
                 log_Yb_pred = model(Xb, log_P0b)
                 S_pred = model.signature(log_Yb_pred)
                 S_true = model.signature(log_Yb)
-                auto_corr_pred = autocorr(log_Yb_pred)
-                auto_corr_true = autocorr(log_Yb)
+                auto_corr_pred = None #autocorr(log_Yb_pred)
+                auto_corr_true = None # autocorr(log_Yb)
                 loss = criterion({"log_y_pred_levels": log_Yb_pred, "log_y_true_levels": log_Yb, "S_pred": S_pred, "S_true": S_true, 'auto_corr_true': auto_corr_true, 'auto_corr_pred': auto_corr_pred})
                 if train_mode:
                     opt.zero_grad(set_to_none=True)
@@ -119,7 +119,7 @@ if __name__ == "__main__":
     val_df = pd.concat(val_df, axis=0)
 
     X_tr, log_Y_tr, LLP_tr = data_split(step_size=20, max_samples=500000, df=tr_df, feature_generator=build_features_np)
-    X_va, log_Y_va, LLP_va = data_split(step_size=20, max_samples=20000, df=val_df, feature_generator=build_features_np)
+    X_va, log_Y_va, LLP_va = data_split(step_size=20, max_samples=200000, df=val_df, feature_generator=build_features_np)
 
     _, best_state, ds_train_mean, ds_train_std = train(X_train = X_tr, Y_train=log_Y_tr, X_val = X_va, Y_val = log_Y_va, LLP_train=LLP_tr, LLP_val=LLP_va, cnf=cnf)
 

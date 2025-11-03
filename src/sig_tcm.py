@@ -161,13 +161,13 @@ class SigPathLoss(nn.Module):
 
     def forward(self, outputs: dict) -> torch.Tensor:
         L_path = self.l2(outputs["log_y_pred_levels"], outputs["log_y_true_levels"])
-        L_corr = self.l2(outputs['auto_corr_pred'], outputs['auto_corr_true'])
+        #L_corr = self.l2(outputs['auto_corr_pred'], outputs['auto_corr_true'])
 
         if outputs["S_pred"] is not None:
             L_sig = self.l2(outputs["S_pred"], outputs["S_true"])
-            return L_sig + self.lam_path * L_path + self.lam_corr * L_corr
+            return L_sig + self.lam_path * L_path #+ self.lam_corr * L_corr
         else:
-            return self.lam_path * L_path + self.lam_corr * L_corr
+            return self.lam_path * L_path# + self.lam_corr * L_corr
 
 
 class SigLossTCN(nn.Module):
