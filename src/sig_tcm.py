@@ -33,14 +33,14 @@ class Config:
     dim_in: int = 2
     steps: int = 10
     T_in: int = 60
-    batch_size: int = 128
+    batch_size: int = 512
     lr: float = 3e-4
     weight_decay: float = 1e-2
     epochs: int = 5
     sig_depth: int = 3
     use_logsig: bool = True
     num_workers: int = 0
-    device: str = "cuda" if torch.cuda.is_available() else "cpu"
+    device: str = "cuda" #if torch.cuda.is_available() else "cpu"
     head_hidden_dim: int = 256
     encoder_channels: Tuple[int, ...] = (64, 128, 128, 256)
     encoder_k: int = 3
