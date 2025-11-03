@@ -33,7 +33,7 @@ class Config:
     dim_in: int = 46
     steps: int = 10
     T_in: int = 60
-    batch_size: int = 512
+    batch_size: int = 128
     lr: float = 3e-4
     weight_decay: float = 1e-2
     epochs: int = 5
