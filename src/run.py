@@ -14,6 +14,7 @@ from torch.utils.data import Dataset, DataLoader
 from inference import generate_forecast
 from sig_tcm import init_model
 from inference import predict_x_test
+from src.features_generation import build_features_np
 
 if __name__ == "__main__":
     cnf = Config()
@@ -27,7 +28,7 @@ if __name__ == "__main__":
     DATA = ROOT / "data"
     SRC = ROOT / "src"
     SUBM = ROOT / "sample_submission"
-    weights_path = SUBM / "model_weights_0.pkl"
+    weights_path = SUBM / "model_weights_corr.pkl"
     state_dict = torch.load(weights_path, map_location="cpu")
 
     # Load data
@@ -36,7 +37,7 @@ if __name__ == "__main__":
 
     model = init_model(weights_path)
 
-    submission = predict_x_test(model, x_test)
+    submission = predict_x_test(model, x_test, feature_generation=build_features_np)
 
     target_wids = np.arange(10)
     x_like_local = (

@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 import warnings
 from typing import Callable
-
+from src.data_preparation import Seq2FuturePriceDataset
 
 def predict_x_test(model: SigLossTCN, x_test: pd.DataFrame, feature_generation: Callable = None) -> pd.DataFrame:
     """
@@ -22,8 +22,8 @@ def predict_x_test(model: SigLossTCN, x_test: pd.DataFrame, feature_generation: 
     total = x_test["window_id"].nunique()
     with torch.no_grad():
         for wid, g in tqdm(grouped, total=total):
-            # if wid>10:
-            #     continue
+            if wid>10:
+                continue
             g = g.sort_values("time_step")
             # Expect 60 steps per window
             if g["time_step"].nunique() < 60:
@@ -33,16 +33,15 @@ def predict_x_test(model: SigLossTCN, x_test: pd.DataFrame, feature_generation: 
             X = torch.from_numpy(X)
             X = X.unsqueeze(0)
             last_close = X[:, -1, 0] if len(X[:, 0, -1]) > 0 else np.nan
-            LLP = torch.log(last_close)
+            LLP = torch.log(last_close).unsqueeze(-1)
 
             if feature_generation is not None:
-                X = feature_generation(X)
-            d = X.shape[2]
+                X = torch.from_numpy(feature_generation(X.numpy()))
 
-            X = (X - model.mu.view(1, 1, d)) / model.sig.view(1, 1, d)
+            transform_features = Seq2FuturePriceDataset(X, None, p0_tensor=LLP, standardize_X=True, mean=model.mu, std=model.sig)
+
+            X = transform_features.X
             # Keep a copy of last value for fallback
-
-
             yhat = model(X, LLP).squeeze(0).numpy()
             yhat = np.exp(yhat).squeeze(-1)
             for h in range(len(yhat)):

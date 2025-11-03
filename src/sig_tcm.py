@@ -33,10 +33,10 @@ class Config:
     dim_in: int = 4
     steps: int = 10
     T_in: int = 60
-    batch_size: int = 256
+    batch_size: int = 512
     lr: float = 3e-4
     weight_decay: float = 1e-2
-    epochs: int = 20
+    epochs: int = 10
     sig_depth: int = 3
     use_logsig: bool = True
     num_workers: int = 0
@@ -187,13 +187,13 @@ def autocorr_lags12(x: torch.Tensor, demean: bool = True, norm: str = "coeff"):
         eps = 1e-12
         num1 = num1 / (denom.abs() + eps)
         num2 = num2 / (denom.abs() + eps)
-        return torch.cat([num1, num2], dim=1)         # (B, 2, 1)
+        return torch.cat([num1], dim=1)         # (B, 2, 1)
 
     # 'none' or scaled sums: return as-is (stack lags)
-    return torch.cat([num1, num2], dim=1)
+    return torch.cat([num1], dim=1)
 
 class SigPathLoss(nn.Module):
-    def __init__(self, lam_path: float = 0.1, lam_corr: float = 1):
+    def __init__(self, lam_path: float = 0.1, lam_corr: float = 0.1):
         super().__init__()
         self.l2 = nn.MSELoss()
         self.lam_path = lam_path
