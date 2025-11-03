@@ -30,10 +30,10 @@ def add_basepoint(path: torch.Tensor, base_value: float = 0.0) -> torch.Tensor:
 
 @dataclass
 class Config:
-    dim_in: int = 17
+    dim_in: int = 4
     steps: int = 10
     T_in: int = 60
-    batch_size: int = 64
+    batch_size: int = 256
     lr: float = 3e-4
     weight_decay: float = 1e-2
     epochs: int = 5

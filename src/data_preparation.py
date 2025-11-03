@@ -131,7 +131,7 @@ class Seq2FuturePriceDataset(Dataset):
             self.p0 = p0_tensor.float().clone()
         else:
             raise ValueError("Provide p0_tensor explicitly.")
-        self.X = self.X[:,:,:17]
+        self.X = self.X[:,:,:4]
 
     def __len__(self):
         return self.N
