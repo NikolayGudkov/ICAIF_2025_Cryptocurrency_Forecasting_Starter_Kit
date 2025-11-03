@@ -40,7 +40,7 @@ class Config:
     sig_depth: int = 3
     use_logsig: bool = True
     num_workers: int = 0
-    device: str = "cuda" #if torch.cuda.is_available() else "cpu"
+    device: str = "cuda" if torch.cuda.is_available() else "cpu"
     head_hidden_dim: int = 256
     encoder_channels: Tuple[int, ...] = (64, 128, 128, 256)
     encoder_k: int = 3
