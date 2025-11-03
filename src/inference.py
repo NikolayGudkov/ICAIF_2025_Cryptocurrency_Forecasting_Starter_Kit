@@ -22,8 +22,8 @@ def predict_x_test(model: SigLossTCN, x_test: pd.DataFrame, feature_generation: 
     total = x_test["window_id"].nunique()
     with torch.no_grad():
         for wid, g in tqdm(grouped, total=total):
-            if wid>10:
-                continue
+            # if wid>10:
+            #     continue
             g = g.sort_values("time_step")
             # Expect 60 steps per window
             if g["time_step"].nunique() < 60:

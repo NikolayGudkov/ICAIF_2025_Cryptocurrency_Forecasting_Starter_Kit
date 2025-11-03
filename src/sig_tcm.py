@@ -30,7 +30,7 @@ def add_basepoint(path: torch.Tensor, base_value: float = 0.0) -> torch.Tensor:
 
 @dataclass
 class Config:
-    dim_in: int = 2
+    dim_in: int = 46
     steps: int = 10
     T_in: int = 60
     batch_size: int = 512
@@ -113,20 +113,61 @@ class FutureHead(nn.Module):
 # ==========================
 # Loss & Training
 # ==========================
+
+import torch.nn.functional as F
+
+
+def autocorr(x, demean=True, norm='coeff'):
+    """
+    x: (B, T, C) tensor (CPU or CUDA)
+    norm: 'none' | 'biased' | 'unbiased' | 'coeff'
+    returns: (B, T, C) autocorr over non-negative lags
+    """
+    assert x.dim() == 3, "x must be (B, T, C)"
+    B, T, C = x.shape
+    x = x.to(torch.float32)
+
+    # to (B, C, T) for conv1d, then optional de-mean per (b,c)
+    x_bcT = x.transpose(1, 2)  # (B, C, T)
+    if demean:
+        x_bcT = x_bcT - x_bcT.mean(dim=2, keepdim=True)
+
+    # Treat each (b,c) as a separate channel via reshape
+    x_chT = x_bcT.reshape(1, B * C, T)                  # input:  (N=1, channels=B*C, T)
+    w_chT = x_bcT.flip(dims=[2]).reshape(B * C, 1, T)   # weight: (out=B*C, in=1, T)
+
+    r_full = F.conv1d(x_chT, w_chT, padding=T - 1, groups=B * C)  # (1, B*C, 2T-1)
+    r_full = r_full.reshape(B, C, -1)                              # (B, C, 2T-1)
+    r = r_full[:, :, T - 1:]                                       # keep lags 0..T-1  -> (B, C, T)
+
+    # normalizations
+    if norm == 'biased':
+        r = r / T
+    elif norm == 'unbiased':
+        denom = torch.arange(T, 0, -1, device=r.device, dtype=r.dtype).view(1, 1, T)
+        r = r / denom
+    elif norm == 'coeff':
+        r0 = r[:, :, :1].abs().clamp_min(1e-12)  # r(0)
+        r = r / r0
+
+    return r.transpose(1, 2)
+
 class SigPathLoss(nn.Module):
-    def __init__(self, lam_path: float = 0.1):
+    def __init__(self, lam_path: float = 0.1, lam_corr: float = 0.1):
         super().__init__()
         self.l2 = nn.MSELoss()
         self.lam_path = lam_path
+        self.lam_corr = lam_corr
 
     def forward(self, outputs: dict) -> torch.Tensor:
         L_path = self.l2(outputs["log_y_pred_levels"], outputs["log_y_true_levels"])
+        L_corr = self.l2(outputs['auto_corr_pred'], outputs['auto_corr_true'])
 
         if outputs["S_pred"] is not None:
             L_sig = self.l2(outputs["S_pred"], outputs["S_true"])
-            return L_sig + self.lam_path * L_path
+            return L_sig + self.lam_path * L_path + self.lam_corr * L_corr
         else:
-            return L_path
+            return self.lam_path * L_path + self.lam_corr * L_corr
 
 
 class SigLossTCN(nn.Module):

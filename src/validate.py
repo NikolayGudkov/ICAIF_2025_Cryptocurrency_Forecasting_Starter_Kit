@@ -11,7 +11,8 @@ from sig_tcm import Config, SigLossTCN, SigPathLoss
 from src.data_preparation import make_loaders, data_split, Seq2FuturePriceDataset
 import pickle
 from torch.utils.data import Dataset, DataLoader
-
+from src.features_generation import build_features_np
+import torch.nn.functional as F
 
 if __name__ == "__main__":
     cnf = Config()
@@ -49,7 +50,7 @@ if __name__ == "__main__":
 
     val_df = pd.concat(val_df, axis=0)
 
-    X_va, log_Y_va, LLP_va = data_split(step_size=10, max_samples=200, df=val_df)
+    X_va, log_Y_va, LLP_va = data_split(step_size=10, max_samples=200, df=val_df, feature_generator=build_features_np)
 
     ds_va = Seq2FuturePriceDataset(X_va, log_Y_va, p0_tensor=LLP_va, standardize_X=True, mean=state_dict['ds_train_mean'], std=state_dict['ds_train_std'])
     val_loader = DataLoader(ds_va, batch_size=X_va.shape[0], shuffle=False, num_workers=cnf.num_workers)

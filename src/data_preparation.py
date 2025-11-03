@@ -23,7 +23,7 @@ class Seq2FuturePriceDataset(Dataset):
         standardize_X: bool = True,
         mean: Optional[torch.Tensor] = None,
         std: Optional[torch.Tensor] = None,
-        allow_nans: bool = False,
+        allow_nans: bool = True,
         add_missing_indicators: bool = True,
         impute_strategy: str = "mean",           # no internal gaps -> 'mean' is fine
         prefix_fill: str = "first_valid",        # 'first_valid' | 'mean' | 'zero' | 'linear_to_first_mean'
@@ -161,11 +161,12 @@ def make_loaders(
 
 def data_split(df: pd.DataFrame, step_size: int, max_samples: int, feature_generator: Callable = None):
     samples = WindowsDataset(rolling=True, step_size=step_size, max_samples=max_samples, df=df)
-    X, y = torch.from_numpy(samples.X), torch.from_numpy(samples.y)
+    X, y = samples.X, samples.y
 
     if feature_generator is not None:
         X = feature_generator(X)
 
+    X, y = torch.from_numpy(X), torch.from_numpy(y)
     log_y, LLP= torch.log(y), torch.log(X[:,-1, 0]).unsqueeze(dim=1)
 
     return X, log_y, LLP

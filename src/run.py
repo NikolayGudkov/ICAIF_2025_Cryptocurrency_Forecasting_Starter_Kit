@@ -27,7 +27,7 @@ if __name__ == "__main__":
     DATA = ROOT / "data"
     SRC = ROOT / "src"
     SUBM = ROOT / "sample_submission"
-    weights_path = SUBM / "lstm_weights_sig1.pkl"
+    weights_path = SUBM / "model_weights_0.pkl"
     state_dict = torch.load(weights_path, map_location="cpu")
 
     # Load data
